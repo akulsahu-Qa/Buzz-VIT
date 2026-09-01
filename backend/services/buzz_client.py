@@ -28,7 +28,7 @@ import logging
 from typing import Any, Optional
 
 import httpx
-from nostr_sign import privkey_to_pubkey_hex, schnorr_sign_hex
+from services.nostr_sign import privkey_to_pubkey_hex, schnorr_sign_hex
 
 logger = logging.getLogger(__name__)
 
