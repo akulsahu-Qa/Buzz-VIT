@@ -1,0 +1,16 @@
+name: manager_operations_workflow
+description: "V1 Manager Workflow supporting roster, check-in, checklists, and handover."
+version: "1.0"
+
+trigger:
+  type: manual # Simulating time-based triggers for V1
+
+phases:
+  - id: roster_creation
+    states: [ASSIGN, SUBMIT, VALIDATE, COMPLETE]
+  - id: shift_checkin
+    states: [ASSIGN, SUBMIT, VALIDATE, EXCEPTION, COMPLETE]
+  - id: readiness_checklist
+    states: [ASSIGN, SUBMIT, VALIDATE, EXCEPTION, RESOLVE, ESCALATE, COMPLETE]
+  - id: shift_handover
+    states: [ASSIGN, SUBMIT, VALIDATE, EXCEPTION, COMPLETE]

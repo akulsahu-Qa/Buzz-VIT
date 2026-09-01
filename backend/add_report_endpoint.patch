@@ -1,0 +1,39 @@
+--- main.py
++++ main.py
+@@ -104,6 +104,24 @@
+     except Exception as e:
+         logger.error(f"Failed to load execution state: {e}")
+         return {}
++        
++class ReportIssueRequest(BaseModel):
++    nurse_name: str
++    issue_description: str
++
++@app.post("/api/checklists/{workflow_id}/report-issue")
++async def report_issue(workflow_id: str, request: ReportIssueRequest):
++    # Load the execution state to get the workflow type
++    try:
++        with open(f"data/executions/{workflow_id}.json", "r") as f:
++            state = json.load(f)
++    except Exception:
++        raise HTTPException(status_code=404, detail="Workflow not found")
++        
++    workflow_type = state.get("workflow_type")
++    config = registry.get_workflow(workflow_type)
++    
++    checklist_url = f"{CHECKLIST_BASE_URL}/checklist?workflow_id={workflow_id}&type={workflow_type}&view=true"
++    
++    message_content = f"🚨 **ISSUE REPORTED** 🚨\n\n**Workflow:** {config['name']}\n**Reported By:** {request.nurse_name}\n**Issue:** {request.issue_description}\n\nPlease review immediately: {checklist_url}"
++    
++    try:
++        from buzz_client import BuzzClient
++        client = BuzzClient()
++        client.post_message(SUPERVISORS_CHANNEL_ID, message_content)
++        logger.info("Posted issue to supervisors channel")
++    except Exception as e:
++        logger.error(f"Failed to notify supervisor: {e}")
++        
++    return {"status": "issue_reported"}
+ 
+ class CompleteChecklistRequest(BaseModel):
+     nurse_name: str
