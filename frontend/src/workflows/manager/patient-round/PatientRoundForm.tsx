@@ -8,33 +8,34 @@ export function PatientRoundForm() {
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
-  
-  // Form State
-  const [nurseName, setNurseName] = useState("");
-  const [roundType, setRoundType] = useState("Morning");
-  const [healthStatus, setHealthStatus] = useState("");
-  const [clearOnDiagnosis, setClearOnDiagnosis] = useState<boolean | null>(null);
-  const [doctorsAttending, setDoctorsAttending] = useState<boolean | null>(null);
-  const [staffPolite, setStaffPolite] = useState<boolean | null>(null);
-  const [cleanlinessSatisfied, setCleanlinessSatisfied] = useState<boolean | null>(null);
-  
-  // New Expanded Metrics
-  const [dietarySatisfaction, setDietarySatisfaction] = useState<boolean | null>(null);
-  const [nursingResponse, setNursingResponse] = useState<boolean | null>(null);
-  const [painManaged, setPainManaged] = useState<boolean | null>(null);
-  const [dischargeReadiness, setDischargeReadiness] = useState<boolean | null>(null);
-  
-  // Action Items
-  const [urgencyFlag, setUrgencyFlag] = useState("Low");
-  const [requiresFollowUp, setRequiresFollowUp] = useState(false);
-  
-  const [issuesFaced, setIssuesFaced] = useState("");
-  const [managerRemarks, setManagerRemarks] = useState("");
-  
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'ipd' | 'opd' | 'discharge'>('ipd');
+
+  // Form State matching the preferred UI
+  const [ipdData, setIpdData] = useState({
+    health_status: 'Good',
+    diagnosis_clear: true,
+    staff_regular: true,
+    staff_polite: true,
+    cleanliness: true,
+    issue: '',
+  });
+
+  const [opdData, setOpdData] = useState({
+    experience: 'Good',
+    issue: '',
+  });
+
+  const [dischargeData, setDischargeData] = useState({
+    smooth_process: true,
+    issue: '',
+  });
+
   // Photo Upload
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -44,7 +45,8 @@ export function PatientRoundForm() {
     fetch(`${API_BASE}/api/patients`)
       .then((res) => res.json())
       .then((data) => {
-        const found = data.patients.find((p: Patient) => p.id === id);
+        const patientList = Array.isArray(data) ? data : (data.patients || []);
+        const found = patientList.find((p: Patient) => String(p.id) === String(id));
         setPatient(found || null);
         setLoading(false);
       })
@@ -63,7 +65,6 @@ export function PatientRoundForm() {
     setError("");
 
     try {
-      // Read file as base64
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64Data = reader.result as string;
@@ -75,7 +76,7 @@ export function PatientRoundForm() {
 
         if (!res.ok) throw new Error("Failed to upload photo");
         const data = await res.json();
-        setPhotoUrl(data.photo_url);
+        setPhotoUrls(prev => [...prev, data.photo_url]);
         setUploadingPhoto(false);
       };
       reader.readAsDataURL(file);
@@ -88,103 +89,39 @@ export function PatientRoundForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (clearOnDiagnosis === null || doctorsAttending === null || staffPolite === null || cleanlinessSatisfied === null) {
-      setError("Please answer the core Yes/No questions.");
-      return;
-    }
-    if (!nurseName || !healthStatus) {
-      setError("Nurse name and health status are required.");
-      return;
-    }
-
     setSubmitting(true);
     setError("");
 
+    // Consolidate data for the backend based on active tab
+    // We send it to the existing backend endpoint which expects certain fields.
+    // For V1, we map the UI fields to the closest backend fields.
     try {
       const res = await fetch(`${API_BASE}/api/rounds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patient_id: id,
-          nurse_name: nurseName,
-          round_type: roundType,
-          health_status: healthStatus,
-          clear_on_diagnosis: clearOnDiagnosis,
-          doctors_attending: doctorsAttending,
-          staff_polite: staffPolite,
-          cleanliness_satisfied: cleanlinessSatisfied,
-          dietary_satisfaction: dietarySatisfaction,
-          nursing_response: nursingResponse,
-          pain_managed: painManaged,
-          discharge_readiness: dischargeReadiness,
-          urgency_flag: urgencyFlag,
-          requires_follow_up: requiresFollowUp,
-          issues_faced: issuesFaced,
-          manager_remarks: managerRemarks,
-          photo_url: photoUrl
+          nurse_name: "Manager User", // Default or fetch from auth
+          round_type: activeTab === 'ipd' ? 'Morning' : 'Evening', // map tab to round type loosely
+          health_status: activeTab === 'ipd' ? ipdData.health_status : (activeTab === 'opd' ? opdData.experience : "Discharged"),
+          clear_on_diagnosis: ipdData.diagnosis_clear,
+          doctors_attending: ipdData.staff_regular,
+          staff_polite: ipdData.staff_polite,
+          cleanliness_satisfied: ipdData.cleanliness,
+          issues_faced: activeTab === 'ipd' ? ipdData.issue : (activeTab === 'opd' ? opdData.issue : dischargeData.issue),
+          urgency_flag: "Low",
+          requires_follow_up: false,
+          photo_url: photoUrls.length > 0 ? photoUrls.join(',') : null
         }),
       });
 
       if (!res.ok) throw new Error("Failed to submit round");
-      
+
       navigate("/rounds");
     } catch (err: any) {
       setError(err.message);
       setSubmitting(false);
     }
-  };
-
-  const ToggleButtons = ({ value, onChange, label }: { value: boolean | null, onChange: (v: boolean) => void, label: string }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-      <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</label>
-      <div style={{ display: 'flex', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: '4px', border: '1px solid var(--border-subtle)' }}>
-        <button
-          type="button"
-          onClick={() => onChange(true)}
-          style={{
-            flex: 1, padding: '10px', fontSize: '0.9rem', fontWeight: 600, borderRadius: 'var(--radius-sm)',
-            background: value === true ? 'var(--success-dim)' : 'transparent',
-            color: value === true ? 'var(--success)' : 'var(--text-secondary)',
-            border: value === true ? '1px solid hsl(142, 70%, 48% / 0.3)' : '1px solid transparent',
-            transition: 'var(--transition-fast)'
-          }}
-        >
-          Yes
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(false)}
-          style={{
-            flex: 1, padding: '10px', fontSize: '0.9rem', fontWeight: 600, borderRadius: 'var(--radius-sm)',
-            background: value === false ? 'hsl(4, 90%, 58% / 0.2)' : 'transparent',
-            color: value === false ? 'var(--danger)' : 'var(--text-secondary)',
-            border: value === false ? '1px solid hsl(4, 90%, 58% / 0.3)' : '1px solid transparent',
-            transition: 'var(--transition-fast)'
-          }}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  );
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--border-subtle)',
-    background: 'var(--bg-elevated)',
-    color: 'var(--text-primary)',
-    fontSize: '0.95rem',
-    outline: 'none',
-    transition: 'border-color var(--transition-fast)',
-    marginBottom: '16px',
-    fontFamily: 'inherit'
-  };
-
-  const sectionStyle = {
-    padding: '24px',
-    borderBottom: '1px solid var(--border-subtle)'
   };
 
   if (loading) {
@@ -214,141 +151,162 @@ export function PatientRoundForm() {
   return (
     <div className="checklist-page">
       <div className="checklist-card">
-        
-        {/* Header */}
-        <header className="checklist-header" style={{ alignItems: 'center' }}>
-          <button onClick={() => navigate("/rounds")} style={{ color: 'var(--text-muted)', fontSize: '1.5rem', marginRight: '8px' }}>
-            ←
-          </button>
-          <div className="checklist-header__text">
-            <h1 className="checklist-header__title">Patient Round</h1>
-            <div className="checklist-header__nurse">Room {patient.room_no}</div>
+        <header className="checklist-header" style={{ flexDirection: "column", alignItems: "stretch", gap: "8px", paddingBottom: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+            <button onClick={() => navigate("/rounds")} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: "1.2rem", cursor: "pointer", padding: "0 8px 0 0" }}>
+              ←
+            </button>
+            <div className="checklist-icon" style={{ fontSize: "24px", lineHeight: 1 }}>📋</div>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)", letterSpacing: "1px", textTransform: "uppercase" }}>
+              Manager Operations
+            </span>
           </div>
+          <h1 className="checklist-title" style={{ fontSize: "28px", margin: 0, lineHeight: 1.2 }}>Patient Round</h1>
+          <p className="checklist-meta" style={{ color: "var(--text-secondary)", margin: 0 }}>
+            Complete daily patient check-in and satisfaction survey for Room {patient.room_no}.
+          </p>
         </header>
 
-        {/* Patient Details Summary */}
-        <div style={sectionStyle}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>{patient.name}</h2>
-          <div className="checklist-item__description" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            <span className="sop-tag">Consultant: {patient.consultant}</span>
-            <span className="sop-tag">Procedure: {patient.procedure}</span>
-          </div>
-        </div>
-
         <form onSubmit={handleSubmit}>
-          
-          <div style={sectionStyle}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>Staff Info</h3>
-            
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Manager/Nurse Name</label>
-            <input type="text" value={nurseName} onChange={e => setNurseName(e.target.value)} style={inputStyle} placeholder="e.g. Alok Tiwari" required />
-            
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Round Type</label>
-            <select value={roundType} onChange={e => setRoundType(e.target.value)} style={inputStyle}>
-              <option value="Morning">Morning Round</option>
-              <option value="Evening">Evening Round</option>
-              <option value="Night">Night Round</option>
-            </select>
-          </div>
+          <div style={{ marginTop: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "24px", borderBottom: "1px solid var(--border-subtle)", padding: "0 28px", margin: "0 -28px 10px" }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ipd')}
+                style={{ background: "none", border: "none", fontWeight: activeTab === 'ipd' ? '600' : '400', padding: "12px 4px", color: activeTab === 'ipd' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'ipd' ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: "-1px" }}>
+                IPD Daily
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('opd')}
+                style={{ background: "none", border: "none", fontWeight: activeTab === 'opd' ? '600' : '400', padding: "12px 4px", color: activeTab === 'opd' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'opd' ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: "-1px" }}>
+                OPD Feedback
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('discharge')}
+                style={{ background: "none", border: "none", fontWeight: activeTab === 'discharge' ? '600' : '400', padding: "12px 4px", color: activeTab === 'discharge' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'discharge' ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: "-1px" }}>
+                Post-Discharge
+              </button>
+            </div>
 
-          <div style={sectionStyle}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>Patient Feedback</h3>
-            
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>How is your health today?</label>
-            <input type="text" value={healthStatus} onChange={e => setHealthStatus(e.target.value)} style={inputStyle} placeholder="e.g. Feeling better, Pain in leg..." required />
-
-            <ToggleButtons label="Are you clear about your diagnosis & treatment?" value={clearOnDiagnosis} onChange={setClearOnDiagnosis} />
-            <ToggleButtons label="Have doctors and nurses been attending regularly?" value={doctorsAttending} onChange={setDoctorsAttending} />
-            <ToggleButtons label="Has the staff been polite and respectful?" value={staffPolite} onChange={setStaffPolite} />
-            <ToggleButtons label="Are you satisfied with hospital cleanliness?" value={cleanlinessSatisfied} onChange={setCleanlinessSatisfied} />
-            
-            <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)', margin: '24px 0 12px' }}>Expanded Metrics (Optional)</h4>
-            <ToggleButtons label="Dietary: Satisfied with food quality?" value={dietarySatisfaction} onChange={setDietarySatisfaction} />
-            <ToggleButtons label="Nursing: Quick response to calls?" value={nursingResponse} onChange={setNursingResponse} />
-            <ToggleButtons label="Pain: Is pain managed effectively?" value={painManaged} onChange={setPainManaged} />
-            <ToggleButtons label="Discharge: Clear on discharge instructions?" value={dischargeReadiness} onChange={setDischargeReadiness} />
-            
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', marginTop: '16px' }}>Any specific issue faced?</label>
-            <textarea value={issuesFaced} onChange={e => setIssuesFaced(e.target.value)} rows={2} style={inputStyle} placeholder="Optional..." />
-          </div>
-
-          <div style={sectionStyle}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>Action Items</h3>
-            
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Urgency Flag</label>
-            <select value={urgencyFlag} onChange={e => setUrgencyFlag(e.target.value)} style={{ ...inputStyle, border: urgencyFlag === 'High' ? '1px solid var(--danger)' : inputStyle.border }}>
-              <option value="Low">🟢 Low (Routine)</option>
-              <option value="Medium">🟡 Medium</option>
-              <option value="High">🔴 High (Immediate Attention)</option>
-            </select>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={requiresFollowUp} onChange={e => setRequiresFollowUp(e.target.checked)} style={{ width: '20px', height: '20px' }} />
-              Requires Follow-up Later Today
-            </label>
-
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Manager Remarks</label>
-            <textarea value={managerRemarks} onChange={e => setManagerRemarks(e.target.value)} rows={2} style={{ ...inputStyle, marginBottom: 0 }} placeholder="e.g. Discussed with RMO, plan discharge..." />
-          </div>
-          
-          <div style={sectionStyle}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>Attachments</h3>
-            
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Attach Photo (Optional)</label>
-            <label style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "var(--bg-elevated)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
-              cursor: uploadingPhoto ? "not-allowed" : "pointer",
-              fontSize: "15px",
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-              opacity: uploadingPhoto ? 0.6 : 1
-            }}>
-              {uploadingPhoto ? (
-                <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', marginRight: '8px', borderColor: 'var(--text-primary)', borderTopColor: 'transparent' }}></div>
-              ) : (
-                <span style={{ marginRight: "8px" }}>📷</span>
-              )}
-              {uploadingPhoto ? "Uploading..." : "Add Photo"}
-              <input 
-                type="file" 
-                accept="image/*"
-                onChange={handlePhotoUpload} 
-                disabled={uploadingPhoto}
-                style={{ display: "none" }} 
-              />
-            </label>
-            {photoUrl && (
-              <div style={{ marginTop: '12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <img src={photoUrl} alt="Uploaded" style={{ maxHeight: '100px', borderRadius: 'var(--radius-sm)' }} />
-                <button type="button" onClick={() => setPhotoUrl(null)} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: "14px", fontWeight: 500 }}>
-                  Remove
-                </button>
+            {activeTab === 'ipd' && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "15px", padding: "15px 12px" }}>
+                <label style={{ fontSize: "15px" }}>
+                  Health Status today:
+                  <select value={ipdData.health_status} onChange={(e) => setIpdData({ ...ipdData, health_status: e.target.value })} style={{ marginLeft: "10px", padding: "4px 8px", borderRadius: "4px", background: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", outline: "none" }}>
+                    <option>Good</option>
+                    <option>Fair</option>
+                    <option>Poor</option>
+                  </select>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={ipdData.diagnosis_clear} onChange={(e) => setIpdData({ ...ipdData, diagnosis_clear: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  Clear about diagnosis & treatment?
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={ipdData.staff_regular} onChange={(e) => setIpdData({ ...ipdData, staff_regular: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  Doctors/nurses attending regularly?
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={ipdData.staff_polite} onChange={(e) => setIpdData({ ...ipdData, staff_polite: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  Staff polite and respectful?
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={ipdData.cleanliness} onChange={(e) => setIpdData({ ...ipdData, cleanliness: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  Satisfied with cleanliness?
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                  Any specific issues faced?
+                  <textarea value={ipdData.issue} onChange={(e) => setIpdData({ ...ipdData, issue: e.target.value })} rows={2} style={{ padding: "12px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--bg-elevated)", color: "var(--text-primary)", outline: "none", resize: "vertical" }} placeholder="E.g., Bathroom not cleaned..."></textarea>
+                </label>
               </div>
             )}
+
+            {activeTab === 'opd' && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "15px", padding: "15px 12px" }}>
+                <label style={{ fontSize: "15px" }}>
+                  Overall Experience:
+                  <select value={opdData.experience} onChange={(e) => setOpdData({ ...opdData, experience: e.target.value })} style={{ marginLeft: "10px", padding: "4px 8px", borderRadius: "4px", background: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", outline: "none" }}>
+                    <option>Good</option>
+                    <option>Fair</option>
+                    <option>Poor</option>
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                  Specific Issues:
+                  <textarea value={opdData.issue} onChange={(e) => setOpdData({ ...opdData, issue: e.target.value })} rows={3} style={{ padding: "12px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--bg-elevated)", color: "var(--text-primary)", outline: "none", resize: "vertical" }}></textarea>
+                </label>
+              </div>
+            )}
+
+            {activeTab === 'discharge' && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "15px", padding: "15px 12px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={dischargeData.smooth_process} onChange={(e) => setDischargeData({ ...dischargeData, smooth_process: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  Was the discharge process smooth?
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                  Specific Issues / Complaints:
+                  <textarea value={dischargeData.issue} onChange={(e) => setDischargeData({ ...dischargeData, issue: e.target.value })} rows={3} style={{ padding: "12px", borderRadius: "8px", border: "1px solid var(--border-subtle)", background: "var(--bg-elevated)", color: "var(--text-primary)", outline: "none", resize: "vertical" }}></textarea>
+                </label>
+              </div>
+            )}
+
+            <div style={{ marginTop: "10px", paddingBottom: "15px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "10px", justifyContent: "center" }}>
+                {photoUrls.map((url, index) => (
+                  <div key={index} style={{ position: 'relative' }}>
+                    <img src={url} alt={`Upload ${index}`} style={{ width: "60px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1px solid var(--border-subtle)" }} />
+                    <button type="button" onClick={() => setPhotoUrls(photoUrls.filter((_, i) => i !== index))} style={{ position: 'absolute', top: "-5px", right: "-5px", background: "var(--danger)", color: "white", border: "none", borderRadius: "50%", width: "20px", height: "20px", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('photo-upload-input')?.click()}
+                  disabled={uploadingPhoto}
+                  style={{
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-subtle)",
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    cursor: uploadingPhoto ? "not-allowed" : "pointer",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                >
+                  {uploadingPhoto ? <div className="spinner" style={{ width: "16px", height: "16px", borderWidth: "2px", borderTopColor: "transparent" }} /> : "📷"}
+                  {uploadingPhoto ? "Uploading..." : "Add Photo"}
+                </button>
+                <input
+                  id="photo-upload-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  style={{ display: "none" }}
+                />
+              </div>
+            </div>
+
+            {error && <div style={{ color: "var(--danger)", marginBottom: "16px" }}>⚠️ {error}</div>}
           </div>
 
-          {error && <div style={{ padding: '16px 24px 0', color: 'var(--danger)', fontSize: '0.9rem', fontWeight: 600, textAlign: 'center' }}>{error}</div>}
-
-          <div className="checklist-footer">
-            <button 
-              type="submit" 
+          <div className="checklist-footer" style={{ padding: "15px 0 0" }}>
+            <button
+              type="submit"
               disabled={submitting}
-              className={`btn btn--submit ${submitting ? 'btn--disabled' : 'btn--active'}`}
+              className={`btn btn--active ${submitting ? "btn--disabled" : ""}`}
+              style={{ width: "100%" }}
             >
-              {submitting ? <div className="btn-spinner"></div> : "Submit Round Feedback"}
+              {submitting ? "Submitting..." : "Submit Consolidated Feedback"}
             </button>
-            <div className="checklist-footer__hint">Supervisors will be notified immediately.</div>
           </div>
         </form>
-
       </div>
     </div>
   );

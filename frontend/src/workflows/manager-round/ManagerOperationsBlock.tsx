@@ -77,7 +77,7 @@ export function ManagerOperationsBlock({ taskId, phaseId }: { taskId: string; ph
   const displayPhase = phaseId.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase());
 
   return (
-    <div className="checklist-page" style={{ "--accent": "hsl(210, 85%, 55%)" } as React.CSSProperties}>
+    <div className="checklist-page">
       <div className="checklist-card">
         <header className="checklist-header" style={{ flexDirection: "column", alignItems: "stretch", gap: "8px", paddingBottom: "24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>

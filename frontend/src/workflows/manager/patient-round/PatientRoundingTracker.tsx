@@ -34,7 +34,9 @@ export function PatientRoundingTracker() {
         return res.json();
       })
       .then((data) => {
-        setPatients(data.patients);
+        // Handle both raw array and object with patients property for safety
+        const patientList = Array.isArray(data) ? data : (data.patients || []);
+        setPatients(patientList);
         setLoading(false);
       })
       .catch((err) => {

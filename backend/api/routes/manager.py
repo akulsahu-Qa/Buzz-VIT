@@ -100,7 +100,10 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
         )
         
         if round_data.photo_url:
-            message += f"\n\n**Attached Photo:**\n![Patient Photo]({round_data.photo_url})"
+            photo_links = round_data.photo_url.split(',')
+            message += "\n\n**Attached Photos:**\n"
+            for link in photo_links:
+                message += f"![Patient Photo]({link.strip()})\n"
             
         try:
             client = BuzzClient()

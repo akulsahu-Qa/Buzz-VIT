@@ -7,31 +7,34 @@
 
 /* ── Design Tokens ─────────────────────────────────────────── */
 :root {
-  --bg-base:       hsl(220, 20%, 8%);
-  --bg-surface:    hsl(220, 18%, 12%);
-  --bg-elevated:   hsl(220, 16%, 16%);
-  --bg-hover:      hsl(220, 16%, 20%);
+  /* Light Theme - Dr. Morepen Style */
+  --bg-base:       hsl(0, 0%, 97%); /* Light grey background */
+  --bg-surface:    hsl(0, 0%, 100%); /* Pure white cards */
+  --bg-elevated:   hsl(210, 20%, 95%); /* Very light blue-grey for secondary areas */
+  --bg-hover:      hsl(210, 20%, 92%);
 
-  --border-subtle: hsl(220, 14%, 22%);
-  --border-focus:  var(--accent, hsl(210, 85%, 55%));
+  --border-subtle: hsl(210, 14%, 89%);
+  --border-focus:  var(--accent, hsl(213, 88%, 34%)); /* Dr. Morepen Blue */
 
-  --text-primary:  hsl(220, 20%, 96%);
-  --text-secondary:hsl(220, 12%, 65%);
-  --text-muted:    hsl(220, 10%, 45%);
+  --text-primary:  hsl(220, 20%, 15%); /* Dark grey/black */
+  --text-secondary:hsl(220, 12%, 35%); /* Medium grey */
+  --text-muted:    hsl(220, 10%, 55%);
 
-  --success:       hsl(142, 70%, 48%);
-  --success-dim:   hsl(142, 60%, 20%);
-  --warning:       hsl(38, 95%, 56%);
-  --danger:        hsl(4, 90%, 58%);
+  --success:       hsl(142, 70%, 35%);
+  --success-dim:   hsl(142, 60%, 90%);
+  --warning:       hsl(38, 95%, 45%);
+  --danger:        hsl(4, 90%, 50%);
 
   --radius-sm:     6px;
   --radius-md:     12px;
   --radius-lg:     20px;
   --radius-full:   9999px;
 
-  --shadow-card:   0 4px 32px hsl(220, 30%, 4% / 0.6),
-                   0 1px 4px  hsl(220, 30%, 4% / 0.4);
-  --shadow-glow:   0 0 20px var(--accent, hsl(210, 85%, 55%) / 0.3);
+  --shadow-card:   0 4px 20px hsl(220, 30%, 4% / 0.06),
+                   0 1px 4px  hsl(220, 30%, 4% / 0.03);
+  --shadow-glow:   0 0 20px var(--accent, hsl(213, 88%, 34%) / 0.15);
+  
+  --accent:        hsl(213, 88%, 34%); /* #0a4c95 */
 
   --transition-fast: 150ms ease;
   --transition-med:  250ms cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -92,7 +95,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   border-bottom: 1px solid var(--border-subtle);
   background: linear-gradient(
     135deg,
-    hsl(220, 16%, 14%) 0%,
+    hsl(210, 20%, 92%) 0%,
     var(--bg-surface) 100%
   );
 }
