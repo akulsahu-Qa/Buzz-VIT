@@ -19,6 +19,8 @@ export function ShiftCheckinBlock({ taskId }: { taskId: string; phaseId: string 
     }, 1500);
   };
 
+  const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+
   const handleCheckIn = async () => {
     setIsSubmitting(true);
     try {
@@ -29,7 +31,7 @@ export function ShiftCheckinBlock({ taskId }: { taskId: string; phaseId: string 
         is_late: false // Let the backend sweeper handle actual timeouts, but we can send false by default
       };
 
-      const res = await fetch(`http://localhost:8000/api/tasks/${taskId}/submit`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payload }),
