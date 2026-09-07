@@ -4,30 +4,39 @@ import { PatientRoundForm } from "./workflows/manager/patient-round/PatientRound
 import { ChecklistRoute } from "./workflows/core/ChecklistRoute";
 import { TaskRoute } from "./workflows/core/TaskRoute";
 import { AdminSimulator } from "./workflows/admin/AdminSimulator";
+import { AuthProvider } from "./context/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import "./index.css";
-
-
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* V2 Generic Task Route */}
-        <Route path="/task" element={<TaskRoute />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* V2 Generic Task Route */}
+          <Route path="/task" element={<TaskRoute />} />
 
-        {/* Main checklist route — works for ALL workflow types */}
-        <Route path="/checklist" element={<ChecklistRoute />} />
+          {/* Main checklist route — works for ALL workflow types */}
+          <Route path="/checklist" element={<ChecklistRoute />} />
 
-        {/* Patient Rounding Routes */}
-        <Route path="/rounds" element={<PatientRoundingTracker />} />
-        <Route path="/rounds/:id" element={<PatientRoundForm />} />
+          {/* Patient Rounding Routes */}
+          <Route path="/rounds" element={<PatientRoundingTracker />} />
+          <Route path="/rounds/:id" element={<PatientRoundForm />} />
 
-        {/* Admin Simulator */}
-        <Route path="/admin" element={<AdminSimulator />} />
+          {/* Admin Simulator Protected by Admin PIN */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminSimulator />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Root redirect */}
-        <Route path="/" element={<Navigate to="/admin" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Root redirect */}
+          <Route path="/" element={<Navigate to="/admin" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

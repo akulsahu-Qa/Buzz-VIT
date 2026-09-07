@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 interface StaffOption {
   id: string;
@@ -18,6 +19,7 @@ interface DispatchResult {
 }
 
 export function AdminSimulator() {
+  const { adminLogout } = useAuth();
   const [loadingPhase, setLoadingPhase] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>("test_manager");
@@ -109,13 +111,36 @@ export function AdminSimulator() {
 
   return (
     <div style={{ padding: "40px 20px", maxWidth: "640px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "24px" }}>
-      <div>
-        <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-          System Admin Simulator
-        </h1>
-        <p style={{ margin: "0", color: "var(--text-muted)", fontSize: "14px" }}>
-          Assign tasks directly to user Buzz DMs or trigger automated department notifications.
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
+            System Admin Simulator
+          </h1>
+          <p style={{ margin: "0", color: "var(--text-muted)", fontSize: "14px" }}>
+            Assign tasks directly to user Buzz DMs or trigger automated department notifications.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={adminLogout}
+          title="Lock Admin Portal"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "8px 14px",
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "var(--text-secondary)",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            transition: "all 0.2s ease"
+          }}
+        >
+          🔒 Lock Portal
+        </button>
       </div>
 
       {/* ── Section 1: User-Targeted Direct Message (DM) Dispatch ── */}
