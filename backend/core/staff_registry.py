@@ -16,11 +16,11 @@ def get_demo_staff() -> list[StaffMember]:
     return [
         {
             "id": "test_manager",
-            "name": "Test Manager",
+            "name": os.environ.get("TEST_MANAGER_NAME", "ALOK"),
             "role": "MANAGER",
             "pubkey": os.environ.get(
                 "TEST_MANAGER_PUBKEY", 
-                "0df805e06d9b97d236cb59c0b0ca4f2869994eb09a2236c4e28bac5cac4c7168"
+                "6ffeefa1c96c9e7ea9bf0a8648908db8d8b1671de0d4d8906ba9ed505ad5f3dd"
             ).strip(),
         },
         {

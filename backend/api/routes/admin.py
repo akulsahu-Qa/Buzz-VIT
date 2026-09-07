@@ -153,3 +153,18 @@ async def trigger_daily_rounds():
             logger.error(f"Failed to post daily rounds reminder to Buzz: {exc}")
     return {"status": "triggered"}
 
+@router.post("/rounds/dispatch-daily", summary="Trigger the 12:00 PM daily patient rounds DM dispatch to ALOK")
+async def trigger_daily_patient_rounds_dispatch():
+    from services.rounds_scheduler import dispatch_daily_patient_rounds
+    try:
+        res = await dispatch_daily_patient_rounds(custom_note="12:00 PM Daily Patient Rounds Schedule")
+        return res
+    except Exception as exc:
+        logger.error("Failed to trigger daily patient rounds dispatch: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@router.get("/rounds/schedule-status", summary="Get the 12:00 PM rounds scheduler status")
+async def get_rounds_schedule_status():
+    from services.rounds_scheduler import get_scheduler_status
+    return get_scheduler_status()
+

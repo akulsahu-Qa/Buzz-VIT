@@ -15,7 +15,7 @@ export function PatientRoundForm() {
   // Staff Submitter State
   const [staffList, setStaffList] = useState<{ id: string; name: string; role: string }[]>([]);
   const [selectedStaffName, setSelectedStaffName] = useState<string>(() => {
-    return searchParams.get("staff_name") || localStorage.getItem("active_staff_name") || "Test Manager";
+    return searchParams.get("staff_name") || localStorage.getItem("active_staff_name") || "ALOK";
   });
 
   // Tab State
@@ -203,7 +203,7 @@ export function PatientRoundForm() {
 
     const payload: any = {
       patient_id: id,
-      nurse_name: selectedStaffName || "Test Manager",
+      nurse_name: selectedStaffName || "ALOK",
       round_type: roundType,
       health_status: submitIpd ? ipdData.health_status : (submitDischarge ? "Discharged" : opdData.experience),
       urgency_flag: isUrgent ? "High" : (hasNegative ? "Medium" : "Low"),

@@ -107,6 +107,37 @@ export function AdminSimulator() {
     }
   };
 
+  const triggerAuto12PMRounds = async () => {
+    setLoadingPhase("auto_12pm_rounds");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/rounds/dispatch-daily`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Admin-API-Key": ADMIN_API_KEY
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDispatchResult({
+          status: "success",
+          delivery: data.delivery,
+          staff_name: data.staff_name || "ALOK",
+          message: data.message,
+          task_url: data.task_url
+        });
+        alert(`12:00 PM Patient Rounds DM dispatched to ${data.staff_name || 'ALOK'} successfully!`);
+      } else {
+        throw new Error(data.detail || "Failed to trigger 12 PM rounds");
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(`Failed to trigger 12 PM rounds: ${e.message}`);
+    } finally {
+      setLoadingPhase(null);
+    }
+  };
+
   const selectedStaff = staffList.find(s => s.id === selectedStaffId);
 
   return (
@@ -295,6 +326,24 @@ export function AdminSimulator() {
         <h2 style={{ fontSize: "15px", fontWeight: "600", margin: "0 0 4px 0", color: "var(--text-secondary)" }}>
           Department Broadcast & Quick Links
         </h2>
+
+        <button 
+          onClick={triggerAuto12PMRounds} 
+          disabled={loadingPhase !== null}
+          className="btn"
+          style={{
+            width: "100%",
+            border: "1px solid var(--accent)",
+            padding: "12px",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--accent-dim)",
+            color: "var(--accent)",
+            fontWeight: "600",
+            cursor: "pointer"
+          }}
+        >
+          {loadingPhase === "auto_12pm_rounds" ? "Dispatching 12:00 PM DM..." : "⏰ Simulate 12:00 PM Auto-Dispatch (Rounds to ALOK DM)"}
+        </button>
 
         <button 
           onClick={triggerDailyRounds} 

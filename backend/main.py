@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -33,12 +34,17 @@ def ensure_schema_migrations():
 
 ensure_schema_migrations()
 
+from services.rounds_scheduler import start_rounds_scheduler, stop_rounds_scheduler
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Hospital Workflow API starting up…")
     ensure_schema_migrations()
+    scheduler_task = asyncio.create_task(start_rounds_scheduler())
     yield
-    logger.info("Shutting down.")
+    logger.info("Shutting down hospital workflow API…")
+    stop_rounds_scheduler()
+    scheduler_task.cancel()
 
 app = FastAPI(
     title="Hospital Workflow API",

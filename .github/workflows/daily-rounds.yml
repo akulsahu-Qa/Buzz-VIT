@@ -1,0 +1,26 @@
+name: Daily 12 PM Patient Rounds Auto-Dispatch
+
+on:
+  schedule:
+    # 06:30 UTC is exactly 12:00 PM IST (Indian Standard Time, UTC+5:30)
+    - cron: '30 6 * * *'
+  workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
+
+jobs:
+  dispatch_rounds_dm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send 12 PM Rounds DM to ALOK
+        run: |
+          echo "Triggering 12:00 PM IST Patient Rounds DM on Buzz..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST https://buzz-vit.onrender.com/api/admin/rounds/dispatch-daily \
+            -H "Content-Type: application/json" \
+            -H "X-Admin-API-Key: supersecret123")
+          
+          echo "$RESPONSE"
+          STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Failed to dispatch rounds (Status $STATUS)"
+            exit 1
+          fi
+          echo "Successfully dispatched rounds to ALOK!"
