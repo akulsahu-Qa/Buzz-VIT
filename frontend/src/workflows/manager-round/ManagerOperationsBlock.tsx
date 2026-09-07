@@ -12,11 +12,11 @@ export function ManagerOperationsBlock({ taskId, phaseId }: { taskId: string; ph
   const [ipdData, setIpdData] = useState({
     enabled: true,
     health_status: 'Good',
-    diagnosis_clear: true,
-    staff_regular: true,
-    staff_polite: true,
-    cleanliness: true,
-    gown_linen_changed: true,
+    diagnosis_clear: false,
+    staff_regular: false,
+    staff_polite: false,
+    cleanliness: false,
+    gown_linen_changed: false,
     issue: '',
     photos_added: false,
   });
@@ -28,7 +28,7 @@ export function ManagerOperationsBlock({ taskId, phaseId }: { taskId: string; ph
   });
   const [dischargeData, setDischargeData] = useState({
     enabled: true,
-    smooth_process: true,
+    smooth_process: false,
     issue: '',
     photos_added: false,
   });
