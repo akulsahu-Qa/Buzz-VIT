@@ -7,10 +7,15 @@ from models.db_models import Patient, PatientRound, FacilityIssue
 from models.schemas import PatientSchema, PatientResponse, PatientRoundSchema, PatientRoundResponse, FacilityIssueSchema, FacilityIssueResponse
 from services.buzz_client import BuzzClient
 from core.config import settings
+from core.staff_registry import get_staff_list
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.get("/staff", summary="Get list of available staff members for frontend workflows")
+async def get_staff():
+    return get_staff_list()
 
 @router.get("/patients", response_model=list[PatientResponse], summary="Get list of admitted patients")
 def get_patients(db: Session = Depends(get_db)):
@@ -93,9 +98,10 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
     db.commit()
     db.refresh(db_round)
 
-    supervisors_channel_id = settings.SUPERVISORS_CHANNEL_ID
+    experience_channel_id = settings.PATIENT_EXPERIENCE_CHANNEL_ID or settings.SUPERVISORS_CHANNEL_ID
+    alerts_channel_id = settings.HOSPITAL_ALERTS_CHANNEL_ID
     
-    if supervisors_channel_id:
+    if experience_channel_id or alerts_channel_id:
         # Detect filled categories
         is_ipd = bool(round_data.ipd_filled)
         is_discharge = bool(round_data.discharge_filled)
@@ -238,8 +244,14 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
 
         try:
             client = BuzzClient()
-            await client.post_channel_message(supervisors_channel_id, message)
-            logger.info("Posted patient round summary to supervisors channel")
+            if experience_channel_id:
+                await client.post_channel_message(experience_channel_id, message)
+                logger.info(f"Posted patient round summary to experience channel ({experience_channel_id})")
+
+            # If urgent or negative feedback, ALSO post alert to #hospital-alerts
+            if (is_urgent or has_negative_feedback or needs_follow_up) and alerts_channel_id and alerts_channel_id != experience_channel_id:
+                await client.post_channel_message(alerts_channel_id, message)
+                logger.info(f"Escalated urgent patient alert to hospital-alerts channel ({alerts_channel_id})")
         except Exception as exc:
             logger.error(f"Failed to post round summary to Buzz: {exc}")
 

@@ -1,3 +1,4 @@
+import urllib.parse
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import logging
@@ -32,10 +33,12 @@ async def dispatch_task_to_user(req: DispatchTaskRequest):
     client = BuzzClient()
     checklist_base_url = settings.CHECKLIST_BASE_URL
     task_url = None
+    encoded_name = urllib.parse.quote(staff["name"])
+    staff_query = f"staff_id={staff['id']}&staff_name={encoded_name}"
 
     # Construct the specific task message and action link
     if req.task_type == "patient_round":
-        task_url = f"{checklist_base_url}/rounds"
+        task_url = f"{checklist_base_url}/rounds?{staff_query}"
         message = (
             f"📋 **Patient Rounds Assignment**\n\n"
             f"Hello {staff['name']},\n"
@@ -44,7 +47,7 @@ async def dispatch_task_to_user(req: DispatchTaskRequest):
         )
     elif req.task_type == "shift_checkin":
         task_id = f"checkin-{int(time.time())}"
-        task_url = f"{checklist_base_url}/task?task_id={task_id}&phase_id=shift_checkin"
+        task_url = f"{checklist_base_url}/task?task_id={task_id}&phase_id=shift_checkin&{staff_query}"
         message = (
             f"📍 **Shift Check-in Required**\n\n"
             f"Hello {staff['name']},\n"
@@ -53,7 +56,7 @@ async def dispatch_task_to_user(req: DispatchTaskRequest):
         )
     elif req.task_type == "readiness_checklist":
         task_id = f"readiness-{int(time.time())}"
-        task_url = f"{checklist_base_url}/checklist?workflow_id={task_id}&type=ecg-machine-check"
+        task_url = f"{checklist_base_url}/checklist?workflow_id={task_id}&type=ecg-machine-check&{staff_query}"
         message = (
             f"🩺 **Daily Equipment Check Due**\n\n"
             f"Hello {staff['name']},\n"

@@ -13,8 +13,10 @@ class Settings:
     # DB
     DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///./hospital.db")
     
-    # Buzz
+    # Buzz Channels
     NURSES_CHANNEL_ID: str = os.environ.get("NURSES_CHANNEL_ID", "")
     SUPERVISORS_CHANNEL_ID: str = os.environ.get("SUPERVISORS_CHANNEL_ID", "")
+    HOSPITAL_ALERTS_CHANNEL_ID: str = os.environ.get("HOSPITAL_ALERTS_CHANNEL_ID", "")
+    PATIENT_EXPERIENCE_CHANNEL_ID: str = os.environ.get("PATIENT_EXPERIENCE_CHANNEL_ID", "")
 
 settings = Settings()

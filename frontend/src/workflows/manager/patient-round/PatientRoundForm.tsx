@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import type { Patient } from "./PatientRoundingTracker";
 
 export function PatientRoundForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
 
   const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+
+  // Staff Submitter State
+  const [staffList, setStaffList] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [selectedStaffName, setSelectedStaffName] = useState<string>(() => {
+    return searchParams.get("staff_name") || localStorage.getItem("active_staff_name") || "Test Manager";
+  });
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'ipd' | 'discharge' | 'opd'>('ipd');
@@ -64,7 +71,20 @@ export function PatientRoundForm() {
         setError("Failed to fetch patient details.");
         setLoading(false);
       });
-  }, [id]);
+
+    // Fetch staff list for submitter attribution
+    fetch(`${API_BASE}/api/staff`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setStaffList(data);
+          if (!searchParams.get("staff_name") && !localStorage.getItem("active_staff_name")) {
+            setSelectedStaffName(data[0].name);
+          }
+        }
+      })
+      .catch((err) => console.error("Failed to load staff list:", err));
+  }, [id, API_BASE]);
 
   // Compute which tabs have valid/entered feedback
   const isIpdFilled =
@@ -137,6 +157,7 @@ export function PatientRoundForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting || uploadingPhoto) return;
     setSubmitting(true);
     setError("");
 
@@ -179,7 +200,7 @@ export function PatientRoundForm() {
 
     const payload: any = {
       patient_id: id,
-      nurse_name: "Manager User",
+      nurse_name: selectedStaffName || "Test Manager",
       round_type: roundType,
       health_status: isIpdFilled ? ipdData.health_status : (isDischargeFilled ? "Discharged" : opdData.experience),
       urgency_flag: isUrgent ? "High" : (hasNegative ? "Medium" : "Low"),
@@ -357,6 +378,52 @@ export function PatientRoundForm() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginTop: "6px" }}>
+            {/* Submitter / Conducted By Selection */}
+            <div style={{
+              marginBottom: "14px",
+              padding: "10px 14px",
+              background: "var(--bg-elevated)",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border-subtle)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)" }}>
+                <span>👤</span>
+                <span>Conducted By:</span>
+              </div>
+              <select
+                value={selectedStaffName}
+                onChange={(e) => {
+                  setSelectedStaffName(e.target.value);
+                  localStorage.setItem("active_staff_name", e.target.value);
+                }}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--bg-surface)",
+                  color: "var(--text-primary)",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  outline: "none",
+                  cursor: "pointer"
+                }}
+              >
+                {staffList.length > 0 ? (
+                  staffList.map((staff) => (
+                    <option key={staff.id} value={staff.name}>
+                      {staff.name} ({staff.role})
+                    </option>
+                  ))
+                ) : (
+                  <option value={selectedStaffName}>{selectedStaffName}</option>
+                )}
+              </select>
+            </div>
+
             {/* Feedback Category Dropdown */}
             <div style={{ marginBottom: "16px" }}>
               <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "6px", display: "block" }}>
@@ -591,11 +658,20 @@ export function PatientRoundForm() {
           <div className="checklist-footer" style={{ padding: "16px 0 0" }}>
             <button
               type="submit"
-              disabled={submitting}
-              className={`btn btn--active ${submitting ? "btn--disabled" : ""}`}
-              style={{ width: "100%", padding: "12px" }}
+              disabled={submitting || uploadingPhoto}
+              className={`btn btn--active ${(submitting || uploadingPhoto) ? "btn--disabled" : ""}`}
+              style={{
+                width: "100%",
+                padding: "12px",
+                cursor: (submitting || uploadingPhoto) ? "not-allowed" : "pointer",
+                opacity: (submitting || uploadingPhoto) ? 0.6 : 1
+              }}
             >
-              {submitting ? "Submitting..." : "Submit Consolidated Feedback"}
+              {uploadingPhoto
+                ? "⏳ Uploading photo, please wait..."
+                : submitting
+                  ? "Submitting..."
+                  : "Submit Consolidated Feedback"}
             </button>
           </div>
         </form>

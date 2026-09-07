@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 export interface Patient {
   id: string;
@@ -12,6 +12,23 @@ export interface Patient {
 }
 
 export function PatientRoundingTracker() {
+  const [searchParams] = useSearchParams();
+  const urlStaffName = searchParams.get("staff_name");
+  const urlStaffId = searchParams.get("staff_id");
+
+  useEffect(() => {
+    if (urlStaffName) {
+      localStorage.setItem("active_staff_name", urlStaffName);
+    }
+    if (urlStaffId) {
+      localStorage.setItem("active_staff_id", urlStaffId);
+    }
+  }, [urlStaffName, urlStaffId]);
+
+  const activeStaffName = urlStaffName || localStorage.getItem("active_staff_name") || "";
+  const activeStaffId = urlStaffId || localStorage.getItem("active_staff_id") || "";
+  const staffQuery = activeStaffName ? `?staff_name=${encodeURIComponent(activeStaffName)}&staff_id=${encodeURIComponent(activeStaffId)}` : "";
+
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -146,7 +163,9 @@ export function PatientRoundingTracker() {
           <div className="checklist-header__icon">🩺</div>
           <div className="checklist-header__text">
             <h1 className="checklist-header__title">Patient Rounds</h1>
-            <div className="checklist-header__nurse">Daily Tracker</div>
+            <div className="checklist-header__nurse">
+              Daily Tracker{activeStaffName ? ` • 👤 ${activeStaffName}` : ""}
+            </div>
           </div>
         </header>
 
@@ -269,7 +288,7 @@ export function PatientRoundingTracker() {
             {patients.map((patient) => (
               <Link
                 key={patient.id}
-                to={`/rounds/${patient.id}`}
+                to={`/rounds/${patient.id}${staffQuery}`}
                 className="checklist-item"
                 style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}
               >

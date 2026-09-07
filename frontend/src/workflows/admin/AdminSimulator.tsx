@@ -315,7 +315,11 @@ export function AdminSimulator() {
         </button>
         
         <button 
-          onClick={() => navigate("/rounds")}
+          onClick={() => {
+            const staff = selectedStaff || staffList[0];
+            const query = staff ? `?staff_name=${encodeURIComponent(staff.name)}&staff_id=${staff.id}` : "";
+            navigate(`/rounds${query}`);
+          }}
           className="btn"
           style={{
             width: "100%",
