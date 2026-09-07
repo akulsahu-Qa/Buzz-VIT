@@ -45,6 +45,15 @@ app.include_router(manager.router, prefix="/api", tags=["Manager Workflows"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin Simulation"])
 app.include_router(generic.router, prefix="/api", tags=["Generic"])
 
+@app.get("/", summary="Root endpoint")
+async def root():
+    return {
+        "service": "Buzz-VIT Hospital Workflow API",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
 @app.get("/api/health", summary="Health check")
 async def health():
     return {"status": "ok"}
