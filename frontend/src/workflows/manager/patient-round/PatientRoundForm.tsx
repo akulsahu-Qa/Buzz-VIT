@@ -17,11 +17,11 @@ export function PatientRoundForm() {
   // Form State matching the preferred UI
   const [ipdData, setIpdData] = useState({
     health_status: 'Good',
-    diagnosis_clear: true,
-    staff_regular: true,
-    staff_polite: true,
-    cleanliness: true,
-    gown_linen_changed: true,
+    diagnosis_clear: false,
+    staff_regular: false,
+    staff_polite: false,
+    cleanliness: false,
+    gown_linen_changed: false,
     issue: '',
   });
 
@@ -31,7 +31,7 @@ export function PatientRoundForm() {
   });
 
   const [dischargeData, setDischargeData] = useState({
-    smooth_process: true,
+    smooth_process: false,
     issue: '',
   });
 
