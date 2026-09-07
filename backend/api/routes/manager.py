@@ -68,7 +68,7 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
         issues_text = f"\n**Issues:** {round_data.issues_faced}" if round_data.issues_faced else ""
         remarks_text = f"\n**Remarks:** {round_data.manager_remarks}" if round_data.manager_remarks else ""
         
-        needs_attention = not (round_data.clear_on_diagnosis and round_data.doctors_attending and round_data.staff_polite and round_data.cleanliness_satisfied)
+        needs_attention = not (round_data.clear_on_diagnosis and round_data.doctors_attending and round_data.staff_polite and round_data.cleanliness_satisfied and (round_data.gown_and_linens_changed is not False))
         is_urgent = round_data.urgency_flag == "High"
         needs_follow_up = round_data.requires_follow_up
         
@@ -90,6 +90,7 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
             f"- Doctors attending regularly? {'Yes' if round_data.doctors_attending else 'No'}\n"
             f"- Staff polite? {'Yes' if round_data.staff_polite else 'No'}\n"
             f"- Cleanliness satisfactory? {'Yes' if round_data.cleanliness_satisfied else 'No'}\n"
+            f"- Gown & linen changed? {format_opt_bool(round_data.gown_and_linens_changed)}\n"
             f"- Dietary satisfaction? {format_opt_bool(round_data.dietary_satisfaction)}\n"
             f"- Nursing response? {format_opt_bool(round_data.nursing_response)}\n"
             f"- Pain managed? {format_opt_bool(round_data.pain_managed)}\n"
