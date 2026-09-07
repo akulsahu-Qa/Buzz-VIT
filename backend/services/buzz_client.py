@@ -108,14 +108,22 @@ class BuzzClient:
         # Nostr public key = x-coordinate of secp256k1 point (32 bytes, hex)
         self._pubkey = privkey_to_pubkey_hex(bytes.fromhex(privkey_hex))
 
-    def _make_nip98_auth(self, url: str, method: str = "POST") -> str:
-        """Build and sign a NIP-98 HTTP auth event."""
+    def _make_nip98_auth(self, url: str, method: str = "POST", payload_bytes: Optional[bytes] = None) -> str:
+        """Build and sign a NIP-98 HTTP auth event with a unique nonce to prevent replay detection."""
+        tags = [
+            ["u", url],
+            ["method", method],
+            ["nonce", secrets.token_hex(8)],
+        ]
+        if payload_bytes:
+            tags.append(["payload", hashlib.sha256(payload_bytes).hexdigest()])
+
         auth_event = _build_event(
             privkey_hex=self._privkey_hex,
             pubkey=self._pubkey,
             kind=27235,
             content="",
-            tags=[["u", url], ["method", method]],
+            tags=tags,
         )
         return _nip98_auth_header(auth_event)
 
