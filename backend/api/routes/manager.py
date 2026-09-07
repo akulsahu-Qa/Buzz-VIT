@@ -56,7 +56,39 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    db_round = PatientRound(**round_data.model_dump())
+    # Prepare DB model data (only columns that exist on the table)
+    db_fields = {c.name for c in PatientRound.__table__.columns}
+    raw_data = round_data.model_dump()
+    db_data = {k: v for k, v in raw_data.items() if k in db_fields}
+
+    # Consolidate all attached photos into db_data['photo_url']
+    all_photos = []
+    if round_data.ipd_photos:
+        all_photos.extend([p.strip() for p in round_data.ipd_photos if p.strip()])
+    if round_data.discharge_photos:
+        all_photos.extend([p.strip() for p in round_data.discharge_photos if p.strip()])
+    if round_data.opd_photos:
+        all_photos.extend([p.strip() for p in round_data.opd_photos if p.strip()])
+    if round_data.photo_url:
+        for p in round_data.photo_url.split(","):
+            clean = p.strip()
+            if clean and clean not in all_photos:
+                all_photos.append(clean)
+    if all_photos:
+        db_data["photo_url"] = ",".join(all_photos)
+
+    # Consolidate issues if multi-tab
+    all_issues = []
+    if round_data.ipd_issues and round_data.ipd_issues.strip():
+        all_issues.append(f"[IPD]: {round_data.ipd_issues.strip()}")
+    if round_data.discharge_issues and round_data.discharge_issues.strip():
+        all_issues.append(f"[Post-Discharge]: {round_data.discharge_issues.strip()}")
+    if round_data.opd_issues and round_data.opd_issues.strip():
+        all_issues.append(f"[OPD]: {round_data.opd_issues.strip()}")
+    if all_issues:
+        db_data["issues_faced"] = "\n".join(all_issues)
+
+    db_round = PatientRound(**db_data)
     db.add(db_round)
     db.commit()
     db.refresh(db_round)
@@ -64,31 +96,58 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
     supervisors_channel_id = settings.SUPERVISORS_CHANNEL_ID
     
     if supervisors_channel_id:
-        # Determine negative feedback / urgency
-        is_urgent = round_data.urgency_flag == "High"
-        needs_follow_up = round_data.requires_follow_up
-        
-        has_negative_feedback = False
-        if round_data.clear_on_diagnosis is False: has_negative_feedback = True
-        if round_data.doctors_attending is False: has_negative_feedback = True
-        if round_data.staff_polite is False: has_negative_feedback = True
-        if round_data.cleanliness_satisfied is False: has_negative_feedback = True
-        if round_data.gown_and_linens_changed is False: has_negative_feedback = True
-        if round_data.discharge_readiness is False: has_negative_feedback = True
-        if round_data.health_status == "Poor": has_negative_feedback = True
+        # Detect filled categories
+        is_ipd = bool(round_data.ipd_filled)
+        is_discharge = bool(round_data.discharge_filled)
+        is_opd = bool(round_data.opd_filled)
 
-        alert_emoji = "🚨 " if is_urgent else "⚠️ " if (has_negative_feedback or needs_follow_up) else "✅ "
+        # Fallback to legacy fields/round_type if explicit flags weren't provided
+        if not is_ipd and not is_discharge and not is_opd:
+            r_type = (round_data.round_type or "").lower()
+            if "discharge" in r_type or round_data.discharge_readiness is not None or round_data.discharge_smooth is not None:
+                is_discharge = True
+            elif "opd" in r_type:
+                is_opd = True
+            else:
+                is_ipd = True
 
-        # Clean display title based on round_type
-        r_type = (round_data.round_type or "").strip()
-        if r_type.lower() in ("morning", "ipd", "ipd feedback"):
-            display_title = "IPD Feedback"
-        elif r_type.lower() in ("evening", "discharge", "post-discharge", "post-discharge feedback"):
-            display_title = "Post-Discharge"
-        elif r_type.lower() in ("opd", "opd feedback"):
-            display_title = "OPD Feedback"
+        # Display title
+        titles = []
+        if is_ipd: titles.append("IPD")
+        if is_discharge: titles.append("Post-Discharge")
+        if is_opd: titles.append("OPD")
+        if len(titles) > 1:
+            display_title = " & ".join(titles) + " Feedback"
+        elif len(titles) == 1:
+            display_title = titles[0] + " Feedback" if titles[0] != "Post-Discharge" else "Post-Discharge"
         else:
-            display_title = r_type or "Patient Round"
+            display_title = round_data.round_type or "Patient Round"
+
+        # Determine negative feedback / urgency
+        has_negative_feedback = False
+        if is_ipd:
+            if round_data.clear_on_diagnosis is False: has_negative_feedback = True
+            if round_data.doctors_attending is False: has_negative_feedback = True
+            if round_data.staff_polite is False: has_negative_feedback = True
+            if round_data.cleanliness_satisfied is False: has_negative_feedback = True
+            if round_data.gown_and_linens_changed is False: has_negative_feedback = True
+            if (round_data.ipd_health_status or round_data.health_status) == "Poor": has_negative_feedback = True
+
+        if is_discharge:
+            smooth = round_data.discharge_smooth if round_data.discharge_smooth is not None else round_data.discharge_readiness
+            if smooth is False: has_negative_feedback = True
+
+        if is_opd:
+            exp = round_data.opd_experience or round_data.health_status
+            if exp in ("Poor", "Fair"): has_negative_feedback = True
+
+        is_urgent = (
+            round_data.urgency_flag == "High"
+            or (is_ipd and (round_data.ipd_health_status or round_data.health_status) == "Poor")
+            or (is_opd and round_data.opd_experience == "Poor")
+        )
+        needs_follow_up = round_data.requires_follow_up or has_negative_feedback
+        alert_emoji = "🚨 " if is_urgent else "⚠️ " if (has_negative_feedback or needs_follow_up) else "✅ "
 
         lines = [
             f"{alert_emoji} **Patient Round Completed — {display_title}**\n",
@@ -96,21 +155,12 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
             f"**Consultant:** {patient.consultant}",
         ]
 
-        # 1. IPD Feedback Section (only if IPD fields were provided)
-        has_ipd = any(
-            x is not None for x in [
-                round_data.clear_on_diagnosis,
-                round_data.doctors_attending,
-                round_data.staff_polite,
-                round_data.cleanliness_satisfied,
-                round_data.gown_and_linens_changed,
-            ]
-        ) or display_title == "IPD Feedback"
-
-        if has_ipd and display_title not in ("Post-Discharge", "OPD Feedback"):
+        # 1. IPD Feedback Section (only if IPD was filled)
+        if is_ipd:
             lines.append("\n**IPD Feedback:**")
-            if round_data.health_status and round_data.health_status != "Discharged":
-                lines.append(f"- Health status today: {round_data.health_status}")
+            h_status = round_data.ipd_health_status or round_data.health_status
+            if h_status and h_status != "Discharged":
+                lines.append(f"- Health status today: {h_status}")
             if round_data.clear_on_diagnosis is not None:
                 lines.append(f"- Clear about diagnosis & treatment? {'Yes' if round_data.clear_on_diagnosis else 'No'}")
             if round_data.doctors_attending is not None:
@@ -121,45 +171,67 @@ async def submit_patient_round(round_data: PatientRoundSchema, db: Session = Dep
                 lines.append(f"- Satisfied with cleanliness? {'Yes' if round_data.cleanliness_satisfied else 'No'}")
             if round_data.gown_and_linens_changed is not None:
                 lines.append(f"- Gown and linen changed in the morning? {'Yes' if round_data.gown_and_linens_changed else 'No'}")
+            
+            ipd_iss = (round_data.ipd_issues or "").strip()
+            if not ipd_iss and not is_discharge and not is_opd and round_data.issues_faced:
+                ipd_iss = round_data.issues_faced.strip()
+            if ipd_iss:
+                lines.append(f"- Specific Issues: {ipd_iss}")
 
-        # 2. Post-Discharge Section (only if Post-Discharge tab or discharge readiness provided)
-        is_discharge = display_title == "Post-Discharge" or round_data.discharge_readiness is not None
-        if is_discharge and display_title not in ("IPD Feedback", "OPD Feedback"):
+            if round_data.ipd_photos:
+                lines.append("**Attached Photos (IPD):**")
+                for img in round_data.ipd_photos:
+                    if img.strip():
+                        lines.append(f"![IPD Photo]({img.strip()})")
+
+        # 2. Post-Discharge Section (only if Post-Discharge was filled)
+        if is_discharge:
             lines.append("\n**Post-Discharge Feedback:**")
-            if round_data.discharge_readiness is not None:
-                lines.append(f"- Was the discharge process smooth? {'Yes' if round_data.discharge_readiness else 'No'}")
-            elif round_data.health_status == "Discharged":
-                lines.append("- Patient status: Discharged")
+            smooth = round_data.discharge_smooth if round_data.discharge_smooth is not None else round_data.discharge_readiness
+            if smooth is not None:
+                lines.append(f"- Was the discharge process smooth? {'Yes' if smooth else 'No'}")
+            
+            dis_iss = (round_data.discharge_issues or "").strip()
+            if not dis_iss and not is_ipd and not is_opd and round_data.issues_faced:
+                dis_iss = round_data.issues_faced.strip()
+            if dis_iss:
+                lines.append(f"- Specific Issues / Complaints: {dis_iss}")
 
-        # 3. OPD Section (only if OPD tab)
-        is_opd = display_title == "OPD Feedback"
+            if round_data.discharge_photos:
+                lines.append("**Attached Photos (Post-Discharge):**")
+                for img in round_data.discharge_photos:
+                    if img.strip():
+                        lines.append(f"![Post-Discharge Photo]({img.strip()})")
+
+        # 3. OPD Section (only if OPD was filled)
         if is_opd:
             lines.append("\n**OPD Feedback:**")
-            if round_data.health_status:
-                lines.append(f"- Overall Experience: {round_data.health_status}")
+            exp = round_data.opd_experience or (round_data.health_status if not is_ipd else None)
+            if exp:
+                lines.append(f"- Overall Experience: {exp}")
+            
+            opd_iss = (round_data.opd_issues or "").strip()
+            if not opd_iss and not is_ipd and not is_discharge and round_data.issues_faced:
+                opd_iss = round_data.issues_faced.strip()
+            if opd_iss:
+                lines.append(f"- Specific Issues: {opd_iss}")
 
-        # 4. Optional Legacy Metrics (ONLY if provided, never print N/A)
-        if round_data.dietary_satisfaction is not None:
-            lines.append(f"- Dietary satisfaction? {'Yes' if round_data.dietary_satisfaction else 'No'}")
-        if round_data.nursing_response is not None:
-            lines.append(f"- Nursing response? {'Yes' if round_data.nursing_response else 'No'}")
-        if round_data.pain_managed is not None:
-            lines.append(f"- Pain managed? {'Yes' if round_data.pain_managed else 'No'}")
+            if round_data.opd_photos:
+                lines.append("**Attached Photos (OPD):**")
+                for img in round_data.opd_photos:
+                    if img.strip():
+                        lines.append(f"![OPD Photo]({img.strip()})")
 
-        # 5. Issues faced (if provided)
-        if round_data.issues_faced and round_data.issues_faced.strip():
-            lines.append(f"\n**Specific Issues / Remarks:**\n{round_data.issues_faced.strip()}")
-
-        if round_data.manager_remarks and round_data.manager_remarks.strip():
-            lines.append(f"\n**Manager Remarks:**\n{round_data.manager_remarks.strip()}")
-
-        # 6. Attached Photos
-        if round_data.photo_url:
+        # Fallback if photos were attached globally without per-tab list
+        if not round_data.ipd_photos and not round_data.discharge_photos and not round_data.opd_photos and round_data.photo_url:
             photo_links = round_data.photo_url.split(',')
             lines.append("\n**Attached Photos:**")
             for link in photo_links:
                 if link.strip():
                     lines.append(f"![Patient Photo]({link.strip()})")
+
+        if round_data.manager_remarks and round_data.manager_remarks.strip():
+            lines.append(f"\n**Manager Remarks:**\n{round_data.manager_remarks.strip()}")
 
         lines.append(f"\n*Submitted by {round_data.nurse_name}*")
         message = "\n".join(lines)

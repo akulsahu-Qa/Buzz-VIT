@@ -41,6 +41,22 @@ class PatientRoundSchema(BaseModel):
     manager_remarks: Optional[str] = None
     photo_url: Optional[str] = None
 
+    # Consolidated / Multi-tab fields
+    ipd_filled: Optional[bool] = None
+    ipd_health_status: Optional[str] = None
+    ipd_issues: Optional[str] = None
+    ipd_photos: Optional[list[str]] = None
+
+    discharge_filled: Optional[bool] = None
+    discharge_smooth: Optional[bool] = None
+    discharge_issues: Optional[str] = None
+    discharge_photos: Optional[list[str]] = None
+
+    opd_filled: Optional[bool] = None
+    opd_experience: Optional[str] = None
+    opd_issues: Optional[str] = None
+    opd_photos: Optional[list[str]] = None
+
 class PatientRoundResponse(PatientRoundSchema):
     id: str
     created_at: str
