@@ -1,5 +1,6 @@
 import os
 from typing import Optional, TypedDict
+from dotenv import load_dotenv
 
 class StaffMember(TypedDict):
     id: str
@@ -10,6 +11,8 @@ class StaffMember(TypedDict):
 # Configurable staff list for demo and operational dispatch
 def get_demo_staff() -> list[StaffMember]:
     """Dynamically resolves staff list from environment variables on every call."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    load_dotenv(dotenv_path=env_path, override=True)
     return [
         {
             "id": "test_manager",

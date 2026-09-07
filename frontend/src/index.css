@@ -58,10 +58,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 /* ── Checklist Page Layout ─────────────────────────────────── */
 .checklist-page {
   min-height: 100dvh;
+  min-height: 100vh;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 24px 16px 48px;
+  padding: 20px 16px calc(140px + env(safe-area-inset-bottom, 32px));
   background:
     radial-gradient(ellipse 80% 50% at 50% -20%,
       hsl(var(--accent-h, 210) 85% 55% / 0.08) 0%,
@@ -347,7 +348,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 /* ── Footer / Submit ───────────────────────────────────────── */
 .checklist-footer {
-  padding: 20px 28px 28px;
+  padding: 20px 24px calc(36px + env(safe-area-inset-bottom, 24px));
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -569,4 +570,28 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   background: var(--bg-elevated);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
+}
+
+/* ── Mobile Web UI Optimizations (m-web) ──────────────────── */
+@media (max-width: 640px) {
+  .checklist-page {
+    padding: 12px 12px calc(160px + env(safe-area-inset-bottom, 40px));
+  }
+
+  .checklist-card {
+    border-radius: var(--radius-md);
+  }
+
+  .checklist-header {
+    padding: 20px 16px 16px;
+  }
+
+  .checklist-footer {
+    padding: 20px 16px calc(44px + env(safe-area-inset-bottom, 32px));
+  }
+
+  .btn {
+    min-height: 50px;
+    font-size: 1rem;
+  }
 }

@@ -86,7 +86,7 @@ export function PatientRoundForm() {
       .catch((err) => console.error("Failed to load staff list:", err));
   }, [id, API_BASE]);
 
-  // Compute which tabs have valid/entered feedback
+  // Compute which tabs have valid/entered feedback (only true if actually filled/touched)
   const isIpdFilled =
     ipdTouched ||
     ipdPhotos.length > 0 ||
@@ -95,21 +95,18 @@ export function PatientRoundForm() {
     ipdData.staff_regular ||
     ipdData.staff_polite ||
     ipdData.cleanliness ||
-    ipdData.gown_linen_changed ||
-    (!dischargeTouched && !opdTouched && activeTab === 'ipd');
+    ipdData.gown_linen_changed;
 
   const isDischargeFilled =
     dischargeTouched ||
     dischargePhotos.length > 0 ||
     dischargeData.issue.trim().length > 0 ||
-    dischargeData.smooth_process ||
-    (!ipdTouched && !opdTouched && activeTab === 'discharge');
+    dischargeData.smooth_process;
 
   const isOpdFilled =
     opdTouched ||
     opdPhotos.length > 0 ||
-    opdData.issue.trim().length > 0 ||
-    (!ipdTouched && !dischargeTouched && activeTab === 'opd');
+    opdData.issue.trim().length > 0;
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,16 +158,22 @@ export function PatientRoundForm() {
     setSubmitting(true);
     setError("");
 
+    // Determine which tabs to include in submission
+    const hasAnyFilled = isIpdFilled || isDischargeFilled || isOpdFilled;
+    const submitIpd = isIpdFilled || (!hasAnyFilled && activeTab === 'ipd');
+    const submitDischarge = isDischargeFilled || (!hasAnyFilled && activeTab === 'discharge');
+    const submitOpd = isOpdFilled || (!hasAnyFilled && activeTab === 'opd');
+
     // Consolidate photos and issues across all filled tabs
     const allPhotos: string[] = [];
-    if (isIpdFilled) allPhotos.push(...ipdPhotos);
-    if (isDischargeFilled) allPhotos.push(...dischargePhotos);
-    if (isOpdFilled) allPhotos.push(...opdPhotos);
+    if (submitIpd) allPhotos.push(...ipdPhotos);
+    if (submitDischarge) allPhotos.push(...dischargePhotos);
+    if (submitOpd) allPhotos.push(...opdPhotos);
 
     const filledTitles: string[] = [];
-    if (isIpdFilled) filledTitles.push("IPD");
-    if (isDischargeFilled) filledTitles.push("Post-Discharge");
-    if (isOpdFilled) filledTitles.push("OPD");
+    if (submitIpd) filledTitles.push("IPD");
+    if (submitDischarge) filledTitles.push("Post-Discharge");
+    if (submitOpd) filledTitles.push("OPD");
 
     const roundType = filledTitles.length > 1
       ? `${filledTitles.join(" & ")} Feedback`
@@ -179,12 +182,12 @@ export function PatientRoundForm() {
         : "Patient Round";
 
     const allIssues: string[] = [];
-    if (isIpdFilled && ipdData.issue.trim()) allIssues.push(`[IPD]: ${ipdData.issue.trim()}`);
-    if (isDischargeFilled && dischargeData.issue.trim()) allIssues.push(`[Post-Discharge]: ${dischargeData.issue.trim()}`);
-    if (isOpdFilled && opdData.issue.trim()) allIssues.push(`[OPD]: ${opdData.issue.trim()}`);
+    if (submitIpd && ipdData.issue.trim()) allIssues.push(`[IPD]: ${ipdData.issue.trim()}`);
+    if (submitDischarge && dischargeData.issue.trim()) allIssues.push(`[Post-Discharge]: ${dischargeData.issue.trim()}`);
+    if (submitOpd && opdData.issue.trim()) allIssues.push(`[OPD]: ${opdData.issue.trim()}`);
 
     // Determine urgency and follow-up
-    const hasIpdNegative = isIpdFilled && (
+    const hasIpdNegative = submitIpd && (
       !ipdData.diagnosis_clear ||
       !ipdData.staff_regular ||
       !ipdData.staff_polite ||
@@ -192,45 +195,45 @@ export function PatientRoundForm() {
       !ipdData.gown_linen_changed ||
       ipdData.health_status === 'Poor'
     );
-    const hasDischargeNegative = isDischargeFilled && !dischargeData.smooth_process;
-    const hasOpdNegative = isOpdFilled && (opdData.experience === 'Poor' || opdData.experience === 'Fair');
+    const hasDischargeNegative = submitDischarge && !dischargeData.smooth_process;
+    const hasOpdNegative = submitOpd && (opdData.experience === 'Poor' || opdData.experience === 'Fair');
 
     const hasNegative = hasIpdNegative || hasDischargeNegative || hasOpdNegative;
-    const isUrgent = (isIpdFilled && ipdData.health_status === 'Poor') || (isOpdFilled && opdData.experience === 'Poor');
+    const isUrgent = (submitIpd && ipdData.health_status === 'Poor') || (submitOpd && opdData.experience === 'Poor');
 
     const payload: any = {
       patient_id: id,
       nurse_name: selectedStaffName || "Test Manager",
       round_type: roundType,
-      health_status: isIpdFilled ? ipdData.health_status : (isDischargeFilled ? "Discharged" : opdData.experience),
+      health_status: submitIpd ? ipdData.health_status : (submitDischarge ? "Discharged" : opdData.experience),
       urgency_flag: isUrgent ? "High" : (hasNegative ? "Medium" : "Low"),
       requires_follow_up: hasNegative,
       photo_url: allPhotos.length > 0 ? allPhotos.join(',') : null,
       issues_faced: allIssues.length > 0 ? allIssues.join('\n') : null,
 
       // IPD fields
-      ipd_filled: isIpdFilled,
-      clear_on_diagnosis: isIpdFilled ? ipdData.diagnosis_clear : null,
-      doctors_attending: isIpdFilled ? ipdData.staff_regular : null,
-      staff_polite: isIpdFilled ? ipdData.staff_polite : null,
-      cleanliness_satisfied: isIpdFilled ? ipdData.cleanliness : null,
-      gown_and_linens_changed: isIpdFilled ? ipdData.gown_linen_changed : null,
-      ipd_health_status: isIpdFilled ? ipdData.health_status : null,
-      ipd_issues: isIpdFilled && ipdData.issue.trim() ? ipdData.issue.trim() : null,
-      ipd_photos: isIpdFilled ? ipdPhotos : [],
+      ipd_filled: submitIpd,
+      clear_on_diagnosis: submitIpd ? ipdData.diagnosis_clear : null,
+      doctors_attending: submitIpd ? ipdData.staff_regular : null,
+      staff_polite: submitIpd ? ipdData.staff_polite : null,
+      cleanliness_satisfied: submitIpd ? ipdData.cleanliness : null,
+      gown_and_linens_changed: submitIpd ? ipdData.gown_linen_changed : null,
+      ipd_health_status: submitIpd ? ipdData.health_status : null,
+      ipd_issues: submitIpd && ipdData.issue.trim() ? ipdData.issue.trim() : null,
+      ipd_photos: submitIpd ? ipdPhotos : [],
 
       // Post-Discharge fields
-      discharge_filled: isDischargeFilled,
-      discharge_readiness: isDischargeFilled ? dischargeData.smooth_process : null,
-      discharge_smooth: isDischargeFilled ? dischargeData.smooth_process : null,
-      discharge_issues: isDischargeFilled && dischargeData.issue.trim() ? dischargeData.issue.trim() : null,
-      discharge_photos: isDischargeFilled ? dischargePhotos : [],
+      discharge_filled: submitDischarge,
+      discharge_readiness: submitDischarge ? dischargeData.smooth_process : null,
+      discharge_smooth: submitDischarge ? dischargeData.smooth_process : null,
+      discharge_issues: submitDischarge && dischargeData.issue.trim() ? dischargeData.issue.trim() : null,
+      discharge_photos: submitDischarge ? dischargePhotos : [],
 
       // OPD fields
-      opd_filled: isOpdFilled,
-      opd_experience: isOpdFilled ? opdData.experience : null,
-      opd_issues: isOpdFilled && opdData.issue.trim() ? opdData.issue.trim() : null,
-      opd_photos: isOpdFilled ? opdPhotos : [],
+      opd_filled: submitOpd,
+      opd_experience: submitOpd ? opdData.experience : null,
+      opd_issues: submitOpd && opdData.issue.trim() ? opdData.issue.trim() : null,
+      opd_photos: submitOpd ? opdPhotos : [],
     };
 
     try {
@@ -358,7 +361,7 @@ export function PatientRoundForm() {
   }
 
   return (
-    <div className="checklist-page">
+    <div className="checklist-page" style={{ paddingBottom: "calc(160px + env(safe-area-inset-bottom, 40px))" }}>
       <div className="checklist-card">
         <header className="checklist-header" style={{ flexDirection: "column", alignItems: "stretch", gap: "8px", paddingBottom: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
@@ -377,7 +380,7 @@ export function PatientRoundForm() {
         </header>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginTop: "6px" }}>
+          <div style={{ padding: "16px 20px 0" }}>
             {/* Submitter / Conducted By Selection */}
             <div style={{
               marginBottom: "14px",
@@ -655,14 +658,17 @@ export function PatientRoundForm() {
             {error && <div style={{ color: "var(--danger)", marginTop: "12px" }}>⚠️ {error}</div>}
           </div>
 
-          <div className="checklist-footer" style={{ padding: "16px 0 0" }}>
+          <div className="checklist-footer" style={{ padding: "20px 20px calc(48px + env(safe-area-inset-bottom, 36px))" }}>
             <button
               type="submit"
               disabled={submitting || uploadingPhoto}
               className={`btn btn--active ${(submitting || uploadingPhoto) ? "btn--disabled" : ""}`}
               style={{
                 width: "100%",
-                padding: "12px",
+                minHeight: "50px",
+                padding: "14px 20px",
+                fontSize: "15px",
+                fontWeight: "600",
                 cursor: (submitting || uploadingPhoto) ? "not-allowed" : "pointer",
                 opacity: (submitting || uploadingPhoto) ? 0.6 : 1
               }}
