@@ -126,3 +126,48 @@ def schnorr_sign_hex(msg32_hex: str, privkey_hex: str) -> str:
     """Convenience wrapper that accepts and returns hex strings."""
     sig = schnorr_sign(bytes.fromhex(msg32_hex), bytes.fromhex(privkey_hex))
     return sig.hex()
+
+
+# ── Bech32 / npub Conversion ───────────────────────────────────────────────────
+
+_BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+def _convertbits(data, frombits, tobits, pad=True):
+    acc = 0
+    bits = 0
+    ret = []
+    maxv = (1 << tobits) - 1
+    max_acc = (1 << (frombits + tobits - 1)) - 1
+    for value in data:
+        if value < 0 or (value >> frombits):
+            return None
+        acc = ((acc << frombits) | value) & max_acc
+        bits += frombits
+        while bits >= tobits:
+            bits -= tobits
+            ret.append((acc >> bits) & maxv)
+    if pad and bits:
+        ret.append((acc << (tobits - bits)) & maxv)
+    return ret
+
+def npub_to_hex(npub: str) -> str:
+    """
+    Accepts either a 64-character hex Nostr public key or an npub1... bech32 string
+    and returns the 64-character lowercase hex public key.
+    """
+    cleaned = npub.strip().lower()
+    if not cleaned.startswith("npub1"):
+        if len(cleaned) == 64 and all(c in "0123456789abcdef" for c in cleaned):
+            return cleaned
+        raise ValueError(f"Invalid pubkey or npub: '{npub}'")
+
+    data = [_BECH32_CHARSET.find(x) for x in cleaned[5:]]
+    if any(x == -1 for x in data):
+        raise ValueError("Invalid bech32 character in npub")
+    # Discard 6-character checksum
+    data = data[:-6]
+    decoded = _convertbits(data, 5, 8, False)
+    if decoded is None or len(decoded) != 32:
+        raise ValueError("Invalid npub payload length (expected 32 bytes)")
+    return bytes(decoded).hex()
+

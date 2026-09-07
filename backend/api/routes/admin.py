@@ -1,13 +1,112 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 import logging
+import time
+from typing import Optional
 
 from api.dependencies import get_admin_api_key
 from services.buzz_client import BuzzClient
 from core.config import settings
+from core.staff_registry import get_staff_list, get_staff_by_id
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_admin_api_key)])
+
+class DispatchTaskRequest(BaseModel):
+    staff_id: str
+    task_type: str  # "patient_round", "shift_checkin", "preshift", "readiness_checklist"
+    custom_note: Optional[str] = None
+
+@router.get("/staff", summary="Get list of available staff members for task dispatch")
+async def list_staff():
+    return get_staff_list()
+
+@router.post("/tasks/dispatch", summary="Dispatch a task directly to a user DM (or channel fallback)")
+async def dispatch_task_to_user(req: DispatchTaskRequest):
+    staff = get_staff_by_id(req.staff_id)
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+
+    client = BuzzClient()
+    checklist_base_url = settings.CHECKLIST_BASE_URL
+    task_url = None
+
+    # Construct the specific task message and action link
+    if req.task_type == "patient_round":
+        task_url = f"{checklist_base_url}/rounds"
+        message = (
+            f"📋 **Patient Rounds Assignment**\n\n"
+            f"Hello {staff['name']},\n"
+            f"Your daily patient rounds are due. Please conduct rounds and submit the feedback form:\n\n"
+            f"👉 [Start Patient Rounds]({task_url})"
+        )
+    elif req.task_type == "shift_checkin":
+        task_id = f"checkin-{int(time.time())}"
+        task_url = f"{checklist_base_url}/task?task_id={task_id}&phase_id=shift_checkin"
+        message = (
+            f"📍 **Shift Check-in Required**\n\n"
+            f"Hello {staff['name']},\n"
+            f"Your shift starts now. Please verify your location and check in:\n\n"
+            f"👉 [Complete Shift Check-in]({task_url})"
+        )
+    elif req.task_type == "readiness_checklist":
+        task_id = f"readiness-{int(time.time())}"
+        task_url = f"{checklist_base_url}/checklist?workflow_id={task_id}&type=ecg-machine-check"
+        message = (
+            f"🩺 **Daily Equipment Check Due**\n\n"
+            f"Hello {staff['name']},\n"
+            f"Please complete the morning equipment readiness inspection:\n\n"
+            f"👉 [Open Equipment Checklist]({task_url})"
+        )
+    elif req.task_type == "preshift":
+        message = (
+            f"⏰ **Pre-Shift Reminder**\n\n"
+            f"Hello {staff['name']},\n"
+            f"Your shift starts in **30 minutes**. Please ensure you are on-site and ready to check in."
+        )
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported task type: {req.task_type}")
+
+    if req.custom_note:
+        message += f"\n\n*Note: {req.custom_note}*"
+
+    # Attempt Direct Message delivery if user has a configured pubkey
+    pubkey = staff.get("pubkey", "").strip()
+    if pubkey and pubkey != "TEST_MANAGER_PUBKEY_PLACEHOLDER":
+        try:
+            res = await client.send_direct_message(pubkey, message)
+            logger.info("Dispatched task '%s' to %s via DM (channel: %s)", req.task_type, staff['name'], res['channel_id'])
+            return {
+                "status": "success",
+                "delivery": "dm",
+                "channel_id": res["channel_id"],
+                "event_id": res["event_id"],
+                "staff_name": staff["name"],
+                "task_url": task_url,
+                "message": f"Task sent directly to {staff['name']}'s Buzz DM"
+            }
+        except Exception as exc:
+            logger.warning("Failed to dispatch DM to %s: %s. Falling back to nurses channel.", staff['name'], exc)
+
+    # Fallback to Nurses Channel
+    nurses_channel = settings.NURSES_CHANNEL_ID
+    if not nurses_channel:
+        raise HTTPException(status_code=500, detail="No pubkey for user and NURSES_CHANNEL_ID is not configured")
+
+    channel_message = f"📢 **Task Assigned to @{staff['name']}**\n\n{message}"
+    event_id = await client.post_channel_message(nurses_channel, channel_message)
+    logger.info("Dispatched task '%s' for %s to nurses channel %s (fallback)", req.task_type, staff['name'], nurses_channel)
+
+    return {
+        "status": "success",
+        "delivery": "channel_fallback",
+        "channel_id": nurses_channel,
+        "event_id": event_id,
+        "staff_name": staff["name"],
+        "task_url": task_url,
+        "message": f"Delivered to team channel for @{staff['name']} (fallback)"
+    }
 
 @router.post("/trigger-preshift", summary="Simulate 7:30 AM pre-shift notification")
 async def trigger_preshift():
@@ -49,3 +148,4 @@ async def trigger_daily_rounds():
         except Exception as exc:
             logger.error(f"Failed to post daily rounds reminder to Buzz: {exc}")
     return {"status": "triggered"}
+

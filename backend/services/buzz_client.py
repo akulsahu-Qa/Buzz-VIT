@@ -28,7 +28,7 @@ import logging
 from typing import Any, Optional
 
 import httpx
-from services.nostr_sign import privkey_to_pubkey_hex, schnorr_sign_hex
+from services.nostr_sign import privkey_to_pubkey_hex, schnorr_sign_hex, npub_to_hex
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,68 @@ class BuzzClient:
 
             logger.info("Posted event %s to channel %s", event["id"], channel_id)
             return event["id"]
+
+    async def open_dm(self, recipient_pubkey: str) -> str:
+        """
+        Opens or retrieves a 1-on-1 private DM channel with the recipient on Buzz.
+        Uses signed kind:41010 command event with tag ["p", recipient_pubkey_hex].
+        Returns the DM channel_id (UUID).
+        Idempotent: returns existing channel_id if DM is already open.
+        """
+        recipient_hex = npub_to_hex(recipient_pubkey)
+        endpoint = f"{self.relay_http_url}/events"
+
+        event = _build_event(
+            privkey_hex=self._privkey_hex,
+            pubkey=self._pubkey,
+            kind=41010,
+            content="",
+            tags=[["p", recipient_hex]],
+        )
+        auth_header = self._make_nip98_auth(endpoint)
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                endpoint,
+                json=event,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": auth_header,
+                },
+            )
+            if response.status_code not in (200, 201):
+                logger.error(
+                    "Buzz open_dm error: HTTP %s — %s",
+                    response.status_code,
+                    response.text[:300],
+                )
+                response.raise_for_status()
+
+            data = response.json()
+            msg = data.get("message", "")
+            channel_id = None
+            if msg.startswith("response:"):
+                inner = json.loads(msg[len("response:"):])
+                channel_id = inner.get("channel_id")
+            elif "channel_id" in data:
+                channel_id = data["channel_id"]
+
+            if not channel_id:
+                raise RuntimeError(f"Could not extract channel_id from open_dm response: {data}")
+
+            logger.info("Opened/retrieved DM channel %s with recipient %s", channel_id, recipient_hex)
+            return channel_id
+
+    async def send_direct_message(self, recipient_pubkey: str, content: str) -> dict[str, str]:
+        """
+        Sends a direct message to a user on Buzz.
+        Opens/retrieves the DM channel (kind 41010) and posts the message (kind 9).
+        Returns {"channel_id": channel_id, "event_id": event_id}.
+        """
+        channel_id = await self.open_dm(recipient_pubkey)
+        event_id = await self.post_channel_message(channel_id, content)
+        return {"channel_id": channel_id, "event_id": event_id}
+
 
     async def post_nurse_task_notification(
         self,
