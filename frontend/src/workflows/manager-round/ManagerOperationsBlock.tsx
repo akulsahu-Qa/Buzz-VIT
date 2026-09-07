@@ -16,6 +16,7 @@ export function ManagerOperationsBlock({ taskId, phaseId }: { taskId: string; ph
     staff_regular: true,
     staff_polite: true,
     cleanliness: true,
+    gown_linen_changed: true,
     issue: '',
     photos_added: false,
   });
@@ -190,22 +191,30 @@ export function ManagerOperationsBlock({ taskId, phaseId }: { taskId: string; ph
 
           {phaseId === "patient_round" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "center", gap: "24px", borderBottom: "1px solid var(--border-subtle)", padding: "0 28px", margin: "0 -28px 10px" }}>
-                <button 
-                  onClick={() => setActiveTab('ipd')} 
-                  style={{ background: "none", border: "none", fontWeight: activeTab === 'ipd' ? '600' : '400', padding: "12px 4px", color: activeTab === 'ipd' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'ipd' ? '2px solid var(--accent, hsl(210, 85%, 55%))' : '2px solid transparent', marginBottom: "-1px" }}>
-                  IPD Daily
-                </button>
-                <button 
-                  onClick={() => setActiveTab('opd')} 
-                  style={{ background: "none", border: "none", fontWeight: activeTab === 'opd' ? '600' : '400', padding: "12px 4px", color: activeTab === 'opd' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'opd' ? '2px solid var(--accent, hsl(210, 85%, 55%))' : '2px solid transparent', marginBottom: "-1px" }}>
-                  OPD Feedback
-                </button>
-                <button 
-                  onClick={() => setActiveTab('discharge')} 
-                  style={{ background: "none", border: "none", fontWeight: activeTab === 'discharge' ? '600' : '400', padding: "12px 4px", color: activeTab === 'discharge' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'discharge' ? '2px solid var(--accent, hsl(210, 85%, 55%))' : '2px solid transparent', marginBottom: "-1px" }}>
-                  Post-Discharge
-                </button>
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "6px", display: "block" }}>
+                  Select Feedback Category:
+                </label>
+                <select
+                  value={activeTab}
+                  onChange={(e) => setActiveTab(e.target.value as 'ipd' | 'opd' | 'discharge')}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border-subtle)",
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-primary)",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    outline: "none"
+                  }}
+                >
+                  <option value="ipd">IPD Feedback</option>
+                  <option value="opd">OPD Feedback</option>
+                  <option value="discharge">Post-Discharge</option>
+                </select>
               </div>
 
               {activeTab === 'ipd' && (
@@ -233,6 +242,10 @@ export function ManagerOperationsBlock({ taskId, phaseId }: { taskId: string; ph
                       <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <input type="checkbox" checked={ipdData.cleanliness} onChange={(e) => setIpdData({...ipdData, cleanliness: e.target.checked})} />
                         Satisfied with cleanliness?
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <input type="checkbox" checked={ipdData.gown_linen_changed} onChange={(e) => setIpdData({...ipdData, gown_linen_changed: e.target.checked})} />
+                        Gown and linen changed in the morning?
                       </label>
                       <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                         Any specific issues faced?

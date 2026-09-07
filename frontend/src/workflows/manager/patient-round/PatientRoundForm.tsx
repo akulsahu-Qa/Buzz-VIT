@@ -21,6 +21,7 @@ export function PatientRoundForm() {
     staff_regular: true,
     staff_polite: true,
     cleanliness: true,
+    gown_linen_changed: true,
     issue: '',
   });
 
@@ -108,6 +109,7 @@ export function PatientRoundForm() {
           doctors_attending: ipdData.staff_regular,
           staff_polite: ipdData.staff_polite,
           cleanliness_satisfied: ipdData.cleanliness,
+          gown_and_linens_changed: ipdData.gown_linen_changed,
           issues_faced: activeTab === 'ipd' ? ipdData.issue : (activeTab === 'opd' ? opdData.issue : dischargeData.issue),
           urgency_flag: "Low",
           requires_follow_up: false,
@@ -169,25 +171,30 @@ export function PatientRoundForm() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginTop: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "center", gap: "24px", borderBottom: "1px solid var(--border-subtle)", padding: "0 28px", margin: "0 -28px 10px" }}>
-              <button
-                type="button"
-                onClick={() => setActiveTab('ipd')}
-                style={{ background: "none", border: "none", fontWeight: activeTab === 'ipd' ? '600' : '400', padding: "12px 4px", color: activeTab === 'ipd' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'ipd' ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: "-1px" }}>
-                IPD Daily
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('opd')}
-                style={{ background: "none", border: "none", fontWeight: activeTab === 'opd' ? '600' : '400', padding: "12px 4px", color: activeTab === 'opd' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'opd' ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: "-1px" }}>
-                OPD Feedback
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('discharge')}
-                style={{ background: "none", border: "none", fontWeight: activeTab === 'discharge' ? '600' : '400', padding: "12px 4px", color: activeTab === 'discharge' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: "pointer", borderBottom: activeTab === 'discharge' ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: "-1px" }}>
-                Post-Discharge
-              </button>
+            <div style={{ marginBottom: "16px", padding: "0 4px" }}>
+              <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "6px", display: "block" }}>
+                Select Feedback Category:
+              </label>
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value as 'ipd' | 'opd' | 'discharge')}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--bg-elevated)",
+                  color: "var(--text-primary)",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  outline: "none"
+                }}
+              >
+                <option value="ipd">IPD Feedback</option>
+                <option value="opd">OPD Feedback</option>
+                <option value="discharge">Post-Discharge</option>
+              </select>
             </div>
 
             {activeTab === 'ipd' && (
@@ -215,6 +222,10 @@ export function PatientRoundForm() {
                 <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
                   <input type="checkbox" checked={ipdData.cleanliness} onChange={(e) => setIpdData({ ...ipdData, cleanliness: e.target.checked })} style={{ width: "16px", height: "16px" }} />
                   Satisfied with cleanliness?
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={ipdData.gown_linen_changed} onChange={(e) => setIpdData({ ...ipdData, gown_linen_changed: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  Gown and linen changed in the morning?
                 </label>
                 <label style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
                   Any specific issues faced?

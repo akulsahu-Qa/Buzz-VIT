@@ -26,6 +26,7 @@ class PatientRoundSchema(BaseModel):
     doctors_attending: Optional[bool] = None
     staff_polite: Optional[bool] = None
     cleanliness_satisfied: Optional[bool] = None
+    gown_and_linens_changed: Optional[bool] = None
     
     # Expanded Metrics
     dietary_satisfaction: Optional[bool] = None

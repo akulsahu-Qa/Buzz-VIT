@@ -36,6 +36,7 @@ class PatientRound(Base):
     doctors_attending = Column(Boolean, nullable=True)
     staff_polite = Column(Boolean, nullable=True)
     cleanliness_satisfied = Column(Boolean, nullable=True)
+    gown_and_linens_changed = Column(Boolean, nullable=True)
     
     # Expanded Metrics (Optional)
     dietary_satisfaction = Column(Boolean, nullable=True)
