@@ -26,6 +26,10 @@ export function PatientRoundingTracker() {
   // Issue Form State
   const [issue, setIssue] = useState({ room_no: "", department: "Maintenance", description: "", reported_by: "" });
 
+  // Submission loading states to prevent spamming
+  const [submittingIssue, setSubmittingIssue] = useState(false);
+  const [submittingPatient, setSubmittingPatient] = useState(false);
+
   const fetchPatients = () => {
     setLoading(true);
     fetch(`${API_BASE}/api/patients`)
@@ -51,6 +55,8 @@ export function PatientRoundingTracker() {
 
   const handleAddPatient = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingPatient) return;
+    setSubmittingPatient(true);
     try {
       const res = await fetch(`${API_BASE}/api/patients`, {
         method: "POST",
@@ -61,14 +67,21 @@ export function PatientRoundingTracker() {
         setActiveForm(null);
         setNewPatient({ name: "", room_no: "", consultant: "", procedure: "" });
         fetchPatients();
+      } else {
+        alert("Failed to admit patient. Please try again.");
       }
     } catch (err) {
       console.error(err);
+      alert("An error occurred while admitting patient.");
+    } finally {
+      setSubmittingPatient(false);
     }
   };
 
   const handleReportIssue = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingIssue) return;
+    setSubmittingIssue(true);
     try {
       const res = await fetch(`${API_BASE}/api/facility-issues`, {
         method: "POST",
@@ -79,9 +92,14 @@ export function PatientRoundingTracker() {
         setActiveForm(null);
         setIssue({ room_no: "", department: "Maintenance", description: "", reported_by: "" });
         alert("Issue reported to supervisors successfully.");
+      } else {
+        alert("Failed to report issue. Please try again.");
       }
     } catch (err) {
       console.error(err);
+      alert("An error occurred while reporting the issue.");
+    } finally {
+      setSubmittingIssue(false);
     }
   };
 
@@ -133,10 +151,26 @@ export function PatientRoundingTracker() {
         </header>
 
         <div style={{ padding: '16px 20px', display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)' }}>
-          <button className="btn btn--primary" onClick={() => setActiveForm(activeForm === "add" ? null : "add")} style={{ flex: 1, padding: '10px' }}>
+          <button 
+            className="btn btn--primary" 
+            disabled={submittingPatient || submittingIssue}
+            onClick={() => setActiveForm(activeForm === "add" ? null : "add")} 
+            style={{ flex: 1, padding: '10px', opacity: (submittingPatient || submittingIssue) ? 0.6 : 1 }}
+          >
             ➕ Add Patient
           </button>
-          <button className="btn btn--primary" onClick={() => setActiveForm(activeForm === "issue" ? null : "issue")} style={{ flex: 1, padding: '10px', background: 'var(--warning)', color: '#000' }}>
+          <button 
+            className="btn btn--primary" 
+            disabled={submittingPatient || submittingIssue}
+            onClick={() => setActiveForm(activeForm === "issue" ? null : "issue")} 
+            style={{ 
+              flex: 1, 
+              padding: '10px', 
+              background: 'var(--warning)', 
+              color: '#000',
+              opacity: (submittingPatient || submittingIssue) ? 0.6 : 1 
+            }}
+          >
             🚨 Report Issue
           </button>
         </div>
@@ -146,13 +180,35 @@ export function PatientRoundingTracker() {
           <div style={{ padding: '20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
             <h3 style={{ marginBottom: '12px', fontSize: '1.1rem' }}>Admit New Patient</h3>
             <form onSubmit={handleAddPatient}>
-              <input style={inputStyle} placeholder="Patient Name" value={newPatient.name} onChange={e => setNewPatient({...newPatient, name: e.target.value})} required />
-              <input style={inputStyle} placeholder="Room No" value={newPatient.room_no} onChange={e => setNewPatient({...newPatient, room_no: e.target.value})} required />
-              <input style={inputStyle} placeholder="Consultant" value={newPatient.consultant} onChange={e => setNewPatient({...newPatient, consultant: e.target.value})} required />
-              <input style={inputStyle} placeholder="Procedure" value={newPatient.procedure} onChange={e => setNewPatient({...newPatient, procedure: e.target.value})} required />
+              <input style={inputStyle} placeholder="Patient Name" value={newPatient.name} onChange={e => setNewPatient({...newPatient, name: e.target.value})} required disabled={submittingPatient} />
+              <input style={inputStyle} placeholder="Room No" value={newPatient.room_no} onChange={e => setNewPatient({...newPatient, room_no: e.target.value})} required disabled={submittingPatient} />
+              <input style={inputStyle} placeholder="Consultant" value={newPatient.consultant} onChange={e => setNewPatient({...newPatient, consultant: e.target.value})} required disabled={submittingPatient} />
+              <input style={inputStyle} placeholder="Procedure" value={newPatient.procedure} onChange={e => setNewPatient({...newPatient, procedure: e.target.value})} required disabled={submittingPatient} />
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="btn btn--active" style={{ flex: 1, padding: '10px' }}>Save</button>
-                <button type="button" className="btn" onClick={() => setActiveForm(null)} style={{ flex: 1, padding: '10px', border: '1px solid var(--border-subtle)' }}>Cancel</button>
+                <button 
+                  type="submit" 
+                  disabled={submittingPatient}
+                  className="btn btn--active" 
+                  style={{ 
+                    flex: 1, 
+                    padding: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: submittingPatient ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {submittingPatient ? (
+                    <>
+                      <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', borderColor: '#ffffff', borderTopColor: 'transparent' }} />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save"
+                  )}
+                </button>
+                <button type="button" disabled={submittingPatient} className="btn" onClick={() => setActiveForm(null)} style={{ flex: 1, padding: '10px', border: '1px solid var(--border-subtle)' }}>Cancel</button>
               </div>
             </form>
           </div>
@@ -163,17 +219,42 @@ export function PatientRoundingTracker() {
           <div style={{ padding: '20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
             <h3 style={{ marginBottom: '12px', fontSize: '1.1rem', color: 'var(--warning)' }}>Report Facility Issue</h3>
             <form onSubmit={handleReportIssue}>
-              <input style={inputStyle} placeholder="Room No" value={issue.room_no} onChange={e => setIssue({...issue, room_no: e.target.value})} required />
-              <select style={inputStyle} value={issue.department} onChange={e => setIssue({...issue, department: e.target.value})}>
+              <input style={inputStyle} placeholder="Room No" value={issue.room_no} onChange={e => setIssue({...issue, room_no: e.target.value})} required disabled={submittingIssue} />
+              <select style={inputStyle} value={issue.department} onChange={e => setIssue({...issue, department: e.target.value})} disabled={submittingIssue}>
                 <option value="Maintenance">Maintenance</option>
                 <option value="Housekeeping">Housekeeping</option>
                 <option value="IT">IT</option>
               </select>
-              <textarea style={inputStyle} placeholder="Describe the issue..." value={issue.description} onChange={e => setIssue({...issue, description: e.target.value})} required />
-              <input style={inputStyle} placeholder="Reported By" value={issue.reported_by} onChange={e => setIssue({...issue, reported_by: e.target.value})} required />
+              <textarea style={inputStyle} placeholder="Describe the issue..." value={issue.description} onChange={e => setIssue({...issue, description: e.target.value})} required disabled={submittingIssue} />
+              <input style={inputStyle} placeholder="Reported By" value={issue.reported_by} onChange={e => setIssue({...issue, reported_by: e.target.value})} required disabled={submittingIssue} />
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="btn btn--active" style={{ flex: 1, padding: '10px', background: 'var(--warning)', color: '#000' }}>Submit Issue</button>
-                <button type="button" className="btn" onClick={() => setActiveForm(null)} style={{ flex: 1, padding: '10px', border: '1px solid var(--border-subtle)' }}>Cancel</button>
+                <button 
+                  type="submit" 
+                  disabled={submittingIssue}
+                  className="btn btn--active" 
+                  style={{ 
+                    flex: 1, 
+                    padding: '10px', 
+                    background: submittingIssue ? 'var(--bg-elevated)' : 'var(--warning)', 
+                    color: submittingIssue ? 'var(--text-muted)' : '#000',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: 600,
+                    cursor: submittingIssue ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {submittingIssue ? (
+                    <>
+                      <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+                      Reporting Issue...
+                    </>
+                  ) : (
+                    "Submit Issue"
+                  )}
+                </button>
+                <button type="button" disabled={submittingIssue} className="btn" onClick={() => setActiveForm(null)} style={{ flex: 1, padding: '10px', border: '1px solid var(--border-subtle)' }}>Cancel</button>
               </div>
             </form>
           </div>

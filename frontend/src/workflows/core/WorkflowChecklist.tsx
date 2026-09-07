@@ -304,9 +304,28 @@ return (
               <button 
                 onClick={handleReportIssue} 
                 disabled={!issueDescription.trim() || pageState === "submitting"} 
-                style={{ background: "#EF4444", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: 600, cursor: "pointer", opacity: !issueDescription.trim() ? 0.5 : 1 }}
+                style={{ 
+                  background: pageState === "submitting" ? "#9CA3AF" : "#EF4444", 
+                  color: "white", 
+                  border: "none", 
+                  padding: "8px 16px", 
+                  borderRadius: "6px", 
+                  fontWeight: 600, 
+                  cursor: pageState === "submitting" ? "not-allowed" : "pointer", 
+                  opacity: !issueDescription.trim() ? 0.5 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
               >
-                {pageState === "submitting" ? "Sending..." : "Submit Alert"}
+                {pageState === "submitting" ? (
+                  <>
+                    <div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px', borderColor: '#ffffff', borderTopColor: 'transparent' }} />
+                    Sending Alert...
+                  </>
+                ) : (
+                  "Submit Alert"
+                )}
               </button>
             </div>
           </div>
