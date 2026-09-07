@@ -12,12 +12,30 @@ from api.routes import manager, admin, generic
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create Database tables (using SQLite directly without migrations for simplicity right now)
+# Create Database tables
 Base.metadata.create_all(bind=engine)
+
+def ensure_schema_migrations():
+    """Ensure newly added columns exist in database tables across SQLite and PostgreSQL."""
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        if "patient_rounds" in inspector.get_table_names():
+            existing_cols = {c["name"] for c in inspector.get_columns("patient_rounds")}
+            if "gown_and_linens_changed" not in existing_cols:
+                logger.info("Migrating patient_rounds: adding gown_and_linens_changed column")
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE patient_rounds ADD COLUMN gown_and_linens_changed BOOLEAN"))
+                logger.info("Successfully added gown_and_linens_changed column")
+    except Exception as exc:
+        logger.error(f"Error during schema migration check: {exc}")
+
+ensure_schema_migrations()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Hospital Workflow API starting up…")
+    ensure_schema_migrations()
     yield
     logger.info("Shutting down.")
 

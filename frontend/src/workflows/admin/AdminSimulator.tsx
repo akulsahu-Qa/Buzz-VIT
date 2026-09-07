@@ -21,6 +21,7 @@ export function AdminSimulator() {
   const [loadingPhase, setLoadingPhase] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>("test_manager");
+  const [customPubkey, setCustomPubkey] = useState<string>("");
   const [selectedTaskType, setSelectedTaskType] = useState<string>("patient_round");
   const [dispatchResult, setDispatchResult] = useState<DispatchResult | null>(null);
 
@@ -62,7 +63,8 @@ export function AdminSimulator() {
         },
         body: JSON.stringify({
           staff_id: selectedStaffId,
-          task_type: selectedTaskType
+          task_type: selectedTaskType,
+          custom_pubkey: customPubkey.trim() || undefined
         })
       });
 
@@ -164,6 +166,27 @@ export function AdminSimulator() {
                 : "ℹ️ No pubkey yet — will deliver via #nurses channel with @mention fallback"}
             </span>
           )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)" }}>
+            Custom Pubkey / npub (Optional override):
+          </label>
+          <input
+            type="text"
+            placeholder="Paste npub1... or 64-character hex to send to any user"
+            value={customPubkey}
+            onChange={(e) => setCustomPubkey(e.target.value)}
+            style={{
+              padding: "10px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border-subtle)",
+              background: "var(--bg-base)",
+              color: "var(--text-primary)",
+              fontSize: "13px",
+              outline: "none"
+            }}
+          />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

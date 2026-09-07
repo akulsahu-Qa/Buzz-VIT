@@ -117,7 +117,14 @@ export function PatientRoundForm() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to submit round");
+      if (!res.ok) {
+        let errMsg = `Server error (${res.status})`;
+        try {
+          const errJson = await res.json();
+          if (errJson.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
 
       navigate("/rounds");
     } catch (err: any) {

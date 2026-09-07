@@ -17,6 +17,7 @@ class DispatchTaskRequest(BaseModel):
     staff_id: str
     task_type: str  # "patient_round", "shift_checkin", "preshift", "readiness_checklist"
     custom_note: Optional[str] = None
+    custom_pubkey: Optional[str] = None
 
 @router.get("/staff", summary="Get list of available staff members for task dispatch")
 async def list_staff():
@@ -71,9 +72,9 @@ async def dispatch_task_to_user(req: DispatchTaskRequest):
     if req.custom_note:
         message += f"\n\n*Note: {req.custom_note}*"
 
-    # Attempt Direct Message delivery if user has a configured pubkey
-    pubkey = staff.get("pubkey", "").strip()
-    if pubkey and pubkey != "TEST_MANAGER_PUBKEY_PLACEHOLDER":
+    # Attempt Direct Message delivery if user has a configured pubkey (or custom pubkey provided)
+    pubkey = req.custom_pubkey.strip() if req.custom_pubkey else staff.get("pubkey", "").strip()
+    if pubkey:
         try:
             res = await client.send_direct_message(pubkey, message)
             logger.info("Dispatched task '%s' to %s via DM (channel: %s)", req.task_type, staff['name'], res['channel_id'])
