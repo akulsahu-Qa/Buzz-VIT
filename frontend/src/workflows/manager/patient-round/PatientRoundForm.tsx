@@ -93,28 +93,55 @@ export function PatientRoundForm() {
     setSubmitting(true);
     setError("");
 
-    // Consolidate data for the backend based on active tab
-    // We send it to the existing backend endpoint which expects certain fields.
-    // For V1, we map the UI fields to the closest backend fields.
+    let payload: any = {
+      patient_id: id,
+      nurse_name: "Manager User",
+      urgency_flag: "Low",
+      requires_follow_up: false,
+      photo_url: photoUrls.length > 0 ? photoUrls.join(',') : null,
+    };
+
+    if (activeTab === 'ipd') {
+      const hasNegative = !ipdData.diagnosis_clear || !ipdData.staff_regular || !ipdData.staff_polite || !ipdData.cleanliness || !ipdData.gown_linen_changed || ipdData.health_status === 'Poor';
+      payload = {
+        ...payload,
+        round_type: "IPD Feedback",
+        health_status: ipdData.health_status,
+        clear_on_diagnosis: ipdData.diagnosis_clear,
+        doctors_attending: ipdData.staff_regular,
+        staff_polite: ipdData.staff_polite,
+        cleanliness_satisfied: ipdData.cleanliness,
+        gown_and_linens_changed: ipdData.gown_linen_changed,
+        issues_faced: ipdData.issue.trim() || null,
+        requires_follow_up: hasNegative,
+        urgency_flag: ipdData.health_status === 'Poor' ? "High" : (hasNegative ? "Medium" : "Low"),
+      };
+    } else if (activeTab === 'opd') {
+      payload = {
+        ...payload,
+        round_type: "OPD Feedback",
+        health_status: opdData.experience,
+        issues_faced: opdData.issue.trim() || null,
+        urgency_flag: opdData.experience === "Poor" ? "High" : opdData.experience === "Fair" ? "Medium" : "Low",
+        requires_follow_up: opdData.experience === "Poor",
+      };
+    } else if (activeTab === 'discharge') {
+      payload = {
+        ...payload,
+        round_type: "Post-Discharge",
+        health_status: "Discharged",
+        discharge_readiness: dischargeData.smooth_process,
+        issues_faced: dischargeData.issue.trim() || null,
+        requires_follow_up: !dischargeData.smooth_process,
+        urgency_flag: !dischargeData.smooth_process ? "Medium" : "Low",
+      };
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/rounds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_id: id,
-          nurse_name: "Manager User", // Default or fetch from auth
-          round_type: activeTab === 'ipd' ? 'Morning' : 'Evening', // map tab to round type loosely
-          health_status: activeTab === 'ipd' ? ipdData.health_status : (activeTab === 'opd' ? opdData.experience : "Discharged"),
-          clear_on_diagnosis: ipdData.diagnosis_clear,
-          doctors_attending: ipdData.staff_regular,
-          staff_polite: ipdData.staff_polite,
-          cleanliness_satisfied: ipdData.cleanliness,
-          gown_and_linens_changed: ipdData.gown_linen_changed,
-          issues_faced: activeTab === 'ipd' ? ipdData.issue : (activeTab === 'opd' ? opdData.issue : dischargeData.issue),
-          urgency_flag: "Low",
-          requires_follow_up: false,
-          photo_url: photoUrls.length > 0 ? photoUrls.join(',') : null
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
