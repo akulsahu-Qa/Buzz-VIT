@@ -109,23 +109,26 @@ async def dispatch_daily_patient_rounds(custom_note: Optional[str] = None) -> di
     _save_dispatch_state(datetime.now(IST).strftime("%Y-%m-%d"), result)
     return result
 
+_last_in_memory_date: Optional[str] = None
+
 async def start_rounds_scheduler():
     """
     Background loop running inside FastAPI lifespan.
-    Checks time every 25 seconds; triggers dispatch when it is 12:00 PM or later in IST
-    if today's rounds have not yet been dispatched.
+    Checks time every 25 seconds; triggers dispatch strictly when it is 12:00 PM IST
+    (12:00:00 - 12:00:59) and has not yet been dispatched today.
     """
-    global _scheduler_running
+    global _scheduler_running, _last_in_memory_date
     _scheduler_running = True
-    logger.info("Patient rounds 12:00 PM IST scheduler started (resilient mode)")
+    logger.info("Patient rounds 12:00 PM IST scheduler started (strict 12:00 PM window)")
 
     while _scheduler_running:
         try:
             now_ist = datetime.now(IST)
-            # If current time is 12:00 PM or later (12:00 to 23:59 IST)
-            if now_ist.hour >= 12:
+            # Strictly trigger during 12:00 PM IST (12:00:00 - 12:00:59)
+            if now_ist.hour == 12 and now_ist.minute == 0:
                 today_str = now_ist.strftime("%Y-%m-%d")
-                if get_last_dispatched_date() != today_str:
+                if _last_in_memory_date != today_str and get_last_dispatched_date() != today_str:
+                    _last_in_memory_date = today_str
                     logger.info("Triggering 12:00 PM IST daily rounds dispatch (current IST: %s)...", now_ist.strftime("%H:%M:%S"))
                     try:
                         await dispatch_daily_patient_rounds(custom_note="Automated 12:00 PM Schedule")
