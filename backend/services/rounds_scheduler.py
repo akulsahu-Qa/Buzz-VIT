@@ -13,18 +13,44 @@ logger = logging.getLogger(__name__)
 # Indian Standard Time (UTC+05:30)
 IST = timezone(timedelta(hours=5, minutes=30))
 
+import json
+import os
+
+DISPATCH_STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "last_rounds_dispatch.json")
+
+def _load_dispatch_state() -> dict:
+    try:
+        if os.path.exists(DISPATCH_STATE_FILE):
+            with open(DISPATCH_STATE_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning("Could not read dispatch state file: %s", e)
+    return {}
+
+def _save_dispatch_state(date_str: str, result: dict):
+    try:
+        os.makedirs(os.path.dirname(DISPATCH_STATE_FILE), exist_ok=True)
+        with open(DISPATCH_STATE_FILE, "w") as f:
+            json.dump({"date": date_str, "result": result}, f)
+    except Exception as e:
+        logger.error("Could not write dispatch state file: %s", e)
+
 _scheduler_running: bool = False
 _scheduler_task: Optional[asyncio.Task] = None
-_last_dispatched_date: Optional[str] = None
-_last_dispatch_result: Optional[dict] = None
+
+def get_last_dispatched_date() -> Optional[str]:
+    state = _load_dispatch_state()
+    return state.get("date")
+
+def get_last_dispatch_result() -> Optional[dict]:
+    state = _load_dispatch_state()
+    return state.get("result")
 
 async def dispatch_daily_patient_rounds(custom_note: Optional[str] = None) -> dict:
     """
     Dispatches the daily patient rounds task to ALOK (test_manager) via Buzz DM
     (with channel fallback if DM cannot be reached).
     """
-    global _last_dispatch_result, _last_dispatched_date
-
     staff_members = get_demo_staff()
     alok = next((s for s in staff_members if s["id"] == "test_manager"), None)
     if not alok:
@@ -62,8 +88,7 @@ async def dispatch_daily_patient_rounds(custom_note: Optional[str] = None) -> di
             result["channel_id"] = dm_res["channel_id"]
             result["event_id"] = dm_res["event_id"]
             result["message"] = f"Rounds task sent directly to {alok['name']}'s Buzz DM"
-            _last_dispatch_result = result
-            _last_dispatched_date = datetime.now(IST).strftime("%Y-%m-%d")
+            _save_dispatch_state(datetime.now(IST).strftime("%Y-%m-%d"), result)
             return result
         except Exception as exc:
             logger.warning("Failed to dispatch 12 PM rounds DM to %s: %s. Falling back to nurses channel.", alok["name"], exc)
@@ -81,27 +106,27 @@ async def dispatch_daily_patient_rounds(custom_note: Optional[str] = None) -> di
     result["channel_id"] = nurses_channel
     result["event_id"] = event_id
     result["message"] = f"Delivered to team channel for @{alok['name']} (fallback)"
-    _last_dispatch_result = result
-    _last_dispatched_date = datetime.now(IST).strftime("%Y-%m-%d")
+    _save_dispatch_state(datetime.now(IST).strftime("%Y-%m-%d"), result)
     return result
 
 async def start_rounds_scheduler():
     """
     Background loop running inside FastAPI lifespan.
-    Checks time every 25 seconds; triggers dispatch when it is 12:00 PM IST (once per day).
+    Checks time every 25 seconds; triggers dispatch when it is 12:00 PM or later in IST
+    if today's rounds have not yet been dispatched.
     """
-    global _scheduler_running, _last_dispatched_date
+    global _scheduler_running
     _scheduler_running = True
-    logger.info("Patient rounds 12:00 PM IST scheduler started")
+    logger.info("Patient rounds 12:00 PM IST scheduler started (resilient mode)")
 
     while _scheduler_running:
         try:
             now_ist = datetime.now(IST)
-            # Target 12:00 PM (12:00 - 12:01 window)
-            if now_ist.hour == 12 and now_ist.minute == 0:
+            # If current time is 12:00 PM or later (12:00 to 23:59 IST)
+            if now_ist.hour >= 12:
                 today_str = now_ist.strftime("%Y-%m-%d")
-                if _last_dispatched_date != today_str:
-                    logger.info("Triggering scheduled 12:00 PM IST daily rounds dispatch...")
+                if get_last_dispatched_date() != today_str:
+                    logger.info("Triggering 12:00 PM IST daily rounds dispatch (current IST: %s)...", now_ist.strftime("%H:%M:%S"))
                     try:
                         await dispatch_daily_patient_rounds(custom_note="Automated 12:00 PM Schedule")
                     except Exception as err:
@@ -130,6 +155,6 @@ def get_scheduler_status() -> dict:
         "current_time_ist": now_ist.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "target_recipient": alok["name"] if alok else "Unknown",
         "target_pubkey_preview": f"{alok['pubkey'][:8]}...{alok['pubkey'][-6:]}" if alok and alok.get("pubkey") else None,
-        "last_dispatched_date": _last_dispatched_date,
-        "last_dispatch_result": _last_dispatch_result,
+        "last_dispatched_date": get_last_dispatched_date(),
+        "last_dispatch_result": get_last_dispatch_result(),
     }
